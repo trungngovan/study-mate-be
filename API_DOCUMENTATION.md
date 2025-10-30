@@ -1,987 +1,1005 @@
 # Study Mate API Documentation
 
-## Base URL
-`http://localhost:8000`
+## New Features: Study Sessions & Study Groups
 
-## Interactive Docs
-- **Swagger UI**: `/api/docs/`
-- **ReDoc**: `/api/redoc/`
+This document provides comprehensive API documentation for the new Study Sessions and Study Groups features.
+
+---
+
+## Table of Contents
+
+1. [Study Sessions API](#study-sessions-api)
+2. [Study Groups API](#study-groups-api)
+3. [WebSocket APIs](#websocket-apis)
+4. [Quick Start Examples](#quick-start-examples)
+
+---
+
+## Study Sessions API
+
+**Base URL:** `/api/sessions/`
+
+### Key Features
+- Create in-person, virtual, or hybrid study sessions
+- Discover nearby sessions
+- Join/leave sessions
+- Check-in/check-out tracking
+- Recurrence support (daily, weekly, monthly)
+
+### Main Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/sessions/` | List all sessions (with filters) |
+| POST | `/api/sessions/` | Create new session |
+| GET | `/api/sessions/{id}/` | Get session details |
+| PUT/PATCH | `/api/sessions/{id}/` | Update session (host only) |
+| DELETE | `/api/sessions/{id}/` | Cancel session (host only) |
+| POST | `/api/sessions/{id}/join/` | Join a session |
+| POST | `/api/sessions/{id}/leave/` | Leave a session |
+| POST | `/api/sessions/{id}/check_in/` | Check in to session |
+| POST | `/api/sessions/{id}/check_out/` | Check out of session |
+| GET | `/api/sessions/{id}/participants/` | List participants |
+| GET | `/api/sessions/my_sessions/` | User's sessions |
+| GET | `/api/sessions/nearby/` | Find nearby sessions |
+
+### Query Parameters for Listing
+
+- `status`: `upcoming`, `in_progress`, `completed`, `cancelled`
+- `session_type`: `in_person`, `virtual`, `hybrid`
+- `subject`: Subject ID (integer)
+- `time_filter`: `upcoming`, `past`
+
+---
+
+## Study Groups API
+
+**Base URL:** `/api/groups/`
+
+### Key Features
+- Create persistent study groups
+- Public, private, or invite-only groups
+- Role-based permissions (admin, moderator, member)
+- Group chat with WebSocket support
+- Member management
+
+### Main Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/` | List all groups (with filters) |
+| POST | `/api/groups/` | Create new group |
+| GET | `/api/groups/{id}/` | Get group details |
+| PUT/PATCH | `/api/groups/{id}/` | Update group (admin only) |
+| DELETE | `/api/groups/{id}/` | Archive group (admin only) |
+| POST | `/api/groups/{id}/join/` | Join/request to join |
+| POST | `/api/groups/{id}/leave/` | Leave group |
+| POST | `/api/groups/{id}/invite/` | Invite user (mod/admin) |
+| GET | `/api/groups/{id}/members/` | List members |
+| GET | `/api/groups/my_groups/` | User's groups |
+| GET | `/api/groups/nearby/` | Find nearby groups |
+
+### Group Membership Management
+
+**Base URL:** `/api/groups/memberships/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/memberships/{id}/` | Get membership details |
+| PATCH | `/api/groups/memberships/{id}/role/` | Update role (admin) |
+| POST | `/api/groups/memberships/{id}/accept/` | Accept join request (admin) |
+| POST | `/api/groups/memberships/{id}/reject/` | Reject join request (admin) |
+| POST | `/api/groups/memberships/{id}/remove/` | Remove member (admin) |
+
+### Group Messages
+
+**Base URL:** `/api/groups/{group_id}/messages/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/{group_id}/messages/` | List messages |
+| POST | `/api/groups/{group_id}/messages/` | Send message |
+| POST | `/api/groups/{group_id}/messages/mark_read/` | Mark as read |
+
+---
+
+## WebSocket APIs
+
+### Group Chat WebSocket
+
+**URL:** `ws://your-domain/ws/groups/{group_id}/chat/?token={jwt_token}`
+
+**Client → Server Messages:**
+
+```json
+// Send message
+{"type": "chat_message", "content": "Hello!"}
+
+// Typing indicator
+{"type": "typing_indicator", "is_typing": true}
+
+// Mark as read
+{"type": "message_read", "message_ids": [1, 2, 3]}
+```
+
+**Server → Client Messages:**
+
+```json
+// New message
+{
+  "type": "chat_message",
+  "message_id": 105,
+  "sender_id": 10,
+  "sender_name": "John Doe",
+  "sender_avatar": "https://...",
+  "content": "Hello!",
+  "created_at": "2025-10-30T16:00:00Z"
+}
+
+// Typing indicator
+{
+  "type": "typing_indicator",
+  "user_id": 10,
+  "user_name": "John Doe",
+  "is_typing": true
+}
+
+// Messages read
+{
+  "type": "messages_read",
+  "user_id": 15,
+  "message_ids": [1, 2, 3],
+  "read_at": "2025-10-30T16:05:00Z"
+}
+```
+
+---
+
+## Quick Start Examples
+
+### Create and Join a Study Session
+
+```javascript
+// Create session
+const session = await fetch('/api/sessions/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    title: 'Calculus Study Group',
+    session_type: 'virtual',
+    meeting_link: 'https://zoom.us/j/123',
+    start_time: '2025-11-01T14:00:00Z',
+    duration_minutes: 120
+  })
+}).then(r => r.json());
+
+// Join session
+await fetch(`/api/sessions/${session.id}/join/`, {
+  method: 'POST',
+  headers: {'Authorization': `Bearer ${token}`}
+});
+```
+
+### Create and Manage a Study Group
+
+```javascript
+// Create group
+const group = await fetch('/api/groups/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Machine Learning Club',
+    description: 'Weekly ML discussions',
+    privacy: 'public',
+    subject_ids: [10, 11]
+  })
+}).then(r => r.json());
+
+// Invite user
+await fetch(`/api/groups/${group.id}/invite/`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({user_id: 42})
+});
+```
+
+### Connect to Group Chat
+
+```javascript
+const ws = new WebSocket(
+  `ws://localhost:8000/ws/groups/${groupId}/chat/?token=${token}`
+);
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (data.type === 'chat_message') {
+    console.log(`${data.sender_name}: ${data.content}`);
+  }
+};
+
+// Send message
+ws.send(JSON.stringify({
+  type: 'chat_message',
+  content: 'Hello everyone!'
+}));
+```
+
+---
 
 ## Authentication
 
-All endpoints require JWT authentication except `/auth/register/` and `/auth/login/`.
+All endpoints require JWT authentication:
 
-**Login to get token:**
-```bash
-POST /api/auth/login/
-{
-  "email": "user@example.com",
-  "password": "password"
-}
+```
+Authorization: Bearer <your_access_token>
 ```
 
-**Use token in headers:**
+For WebSockets, include token in query string:
 ```
-Authorization: Bearer <access_token>
+ws://domain/ws/groups/5/chat/?token=<your_access_token>
 ```
 
 ---
 
-## 🔐 Authentication `/api/auth/`
+## Interactive Documentation
 
-### POST `/api/auth/register/`
-Register a new user account.
+- **Swagger UI**: [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/)
+- **ReDoc**: [http://localhost:8000/api/redoc/](http://localhost:8000/api/redoc/)
+- **OpenAPI Schema**: [http://localhost:8000/api/schema/](http://localhost:8000/api/schema/)
+
+---
+
+*For detailed field descriptions and complete examples, visit `/api/docs/` after starting the server.*
+
+---
+
+## 📅 Study Sessions `/api/sessions/`
+
+Create, discover, and join study sessions - both in-person and virtual.
+
+### Key Features
+- Schedule in-person, virtual, or hybrid study sessions
+- Location-based discovery of nearby sessions
+- Join/leave sessions with participant tracking
+- Check-in/check-out attendance system
+- Recurrence support (daily, weekly, monthly)
+- Host-only controls and permissions
+
+### GET `/api/sessions/`
+List study sessions with optional filters.
+
+**Query Parameters:**
+- `status` - Filter by status: `upcoming`, `in_progress`, `completed`, `cancelled`
+- `session_type` - Filter by type: `in_person`, `virtual`, `hybrid`
+- `subject` - Filter by subject ID
+- `time_filter` - Filter by time: `upcoming`, `past`
+- `page`, `page_size` - Pagination
+
+**Response (200):**
+```json
+{
+  "count": 50,
+  "next": "http://localhost:8000/api/sessions/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "title": "Calculus Study Group",
+      "description": "Reviewing chapters 5-7 for midterm",
+      "host": {
+        "id": 10,
+        "email": "user@example.com",
+        "full_name": "John Doe",
+        "avatar_url": "https://...",
+        "school": 5,
+        "major": "Mathematics",
+        "year": 3
+      },
+      "subject": {
+        "id": 15,
+        "code": "MATH101",
+        "name_en": "Calculus I",
+        "name_vi": "Giải tích I",
+        "level": "intermediate"
+      },
+      "session_type": "hybrid",
+      "location_name": "Library Room 301",
+      "start_time": "2025-11-01T14:00:00Z",
+      "end_time": "2025-11-01T16:00:00Z",
+      "duration_minutes": 120,
+      "participant_count": 5,
+      "max_participants": 10,
+      "is_full": false,
+      "status": "upcoming",
+      "is_host": false,
+      "is_participant": true,
+      "created_at": "2025-10-25T10:00:00Z"
+    }
+  ]
+}
+```
+
+### POST `/api/sessions/`
+Create a new study session.
 
 **Request:**
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123",
-  "password_confirm": "password123",
-  "full_name": "John Doe",
-  "phone": "+1234567890",
-  "school": 1,
-  "major": "Computer Science",
-  "year": 2,
-  "bio": "Hello!",
-  "avatar_url": "https://example.com/avatar.jpg",
-  "learning_radius_km": 5.0,
-  "privacy_level": "open"
+  "title": "Python Study Session",
+  "description": "Learning Flask framework",
+  "subject": 20,
+  "session_type": "virtual",
+  "meeting_link": "https://zoom.us/j/123456789",
+  "start_time": "2025-11-05T18:00:00Z",
+  "duration_minutes": 90,
+  "max_participants": 15,
+  "recurrence_pattern": "weekly",
+  "recurrence_end_date": "2025-12-31"
+}
+```
+
+**For in-person/hybrid sessions:**
+```json
+{
+  "title": "Database Study Group",
+  "description": "SQL practice",
+  "subject": 25,
+  "session_type": "in_person",
+  "location_name": "Computer Lab A",
+  "location_address": "123 Main St, Building 2",
+  "latitude": 10.762622,
+  "longitude": 106.660172,
+  "start_time": "2025-11-05T14:00:00Z",
+  "duration_minutes": 120
 }
 ```
 
 **Response (201):**
 ```json
 {
-  "message": "User registered successfully",
-  "user": {
+  "id": 42,
+  "title": "Python Study Session",
+  "description": "Learning Flask framework",
+  "host": {
     "id": 1,
     "email": "user@example.com",
-    "phone": "+1234567890",
-    "full_name": "John Doe",
-    "school": 1,
-    "school_name": "University Name",
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "learning_radius_km": 5.0,
-    "privacy_level": "open",
-    "status": "active",
-    "last_active_at": null,
-    "created_at": "2025-10-24T10:00:00Z"
-  },
-  "tokens": {
-    "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "access": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-  }
-}
-```
-
-### POST `/api/auth/login/`
-Login with email and password.
-
-**Request:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Login successful",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "phone": "+1234567890",
-    "full_name": "John Doe",
-    "school": 1,
-    "school_name": "University Name",
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "learning_radius_km": 5.0,
-    "privacy_level": "open",
-    "status": "active",
-    "last_active_at": "2025-10-24T10:00:00Z",
-    "created_at": "2025-10-20T10:00:00Z"
-  },
-  "tokens": {
-    "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "access": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-  }
-}
-```
-
-### POST `/api/auth/logout/`
-Logout user by blacklisting refresh token.
-
-**Request:**
-```json
-{
-  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Logout successful"
-}
-```
-
-### POST `/api/auth/token/refresh/`
-Refresh access token using refresh token.
-
-**Request:**
-```json
-{
-  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "access": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc..."
-}
-```
-
-### GET `/api/auth/profile/`
-Get current user's profile.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "phone": "+1234567890",
-  "full_name": "John Doe",
-  "school": 1,
-  "school_name": "University Name",
-  "major": "Computer Science",
-  "year": 2,
-  "bio": "Hello!",
-  "avatar_url": "https://example.com/avatar.jpg",
-  "learning_radius_km": 5.0,
-  "privacy_level": "open",
-  "status": "active",
-  "last_active_at": "2025-10-24T10:00:00Z",
-  "created_at": "2025-10-20T10:00:00Z"
-}
-```
-
-### PUT/PATCH `/api/auth/profile/`
-Update current user's profile.
-
-**Request:**
-```json
-{
-  "full_name": "John Smith",
-  "bio": "Updated bio",
-  "major": "Software Engineering",
-  "year": 3
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "phone": "+1234567890",
-  "full_name": "John Smith",
-  "school": 1,
-  "school_name": "University Name",
-  "major": "Software Engineering",
-  "year": 3,
-  "bio": "Updated bio",
-  "avatar_url": "https://example.com/avatar.jpg",
-  "learning_radius_km": 5.0,
-  "privacy_level": "open",
-  "status": "active",
-  "last_active_at": "2025-10-24T10:00:00Z",
-  "created_at": "2025-10-20T10:00:00Z"
-}
-```
-
-### POST `/api/auth/change-password/`
-Change user's password.
-
-**Request:**
-```json
-{
-  "old_password": "password123",
-  "new_password": "newpassword456",
-  "new_password_confirm": "newpassword456"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Password changed successfully"
-}
-```
-
----
-
-## 📍 Location `/api/users/location/`
-
-### POST `/api/users/location/`
-Update user's current location.
-
-**Request:**
-```json
-{
-  "latitude": 21.028511,
-  "longitude": 105.804817,
-  "accuracy": 15.5
-}
-```
-
-**Response (200):**
-```json
-{
-  "updated": true,
-  "saved_to_history": true,
-  "distance_moved": 150.5,
-  "time_since_last": 1200,
-  "message": "Location saved: moved 150.5m and 20.0 minutes passed",
-  "latitude": 21.028511,
-  "longitude": 105.804817,
-  "timestamp": "2025-10-24T10:00:00Z"
-}
-```
-
-### GET `/api/users/location/current/`
-Get user's current location.
-
-**Response (200):**
-```json
-{
-  "latitude": 21.028511,
-  "longitude": 105.804817,
-  "last_updated": "2025-10-24T10:00:00Z"
-}
-```
-
-### GET `/api/users/location/history/`
-Get user's location history with pagination.
-
-**Query Parameters:**
-- `limit` (default: 50)
-- `from_date` (ISO datetime)
-- `to_date` (ISO datetime)
-
-**Response (200):**
-```json
-{
-  "count": 100,
-  "next": "http://localhost:8000/api/users/location/history/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "latitude": 21.028511,
-      "longitude": 105.804817,
-      "recorded_at": "2025-10-24T10:00:00Z",
-      "accuracy": 15.5
-    }
-  ]
-}
-```
-
-### GET `/api/users/location/history/{id}/`
-Get specific location history entry.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user": 1,
-  "user_email": "user@example.com",
-  "user_name": "John Doe",
-  "latitude": 21.028511,
-  "longitude": 105.804817,
-  "recorded_at": "2025-10-24T10:00:00Z",
-  "accuracy": 15.5,
-  "created_at": "2025-10-24T10:00:00Z"
-}
-```
-
-### GET `/api/users/location/stats/`
-Get location statistics.
-
-**Query Parameters:**
-- `days` (default: 30)
-
-**Response (200):**
-```json
-{
-  "total_records": 45,
-  "days_analyzed": 30,
-  "first_recorded": "2025-09-24T10:00:00Z",
-  "last_recorded": "2025-10-24T10:00:00Z",
-  "current_location": {
-    "latitude": 21.028511,
-    "longitude": 105.804817
-  }
-}
-```
-
----
-
-## 🔍 Discover `/api/discover/`
-
-### GET `/api/discover/nearby-learners/`
-Find nearby learners within specified radius.
-
-**Query Parameters:**
-- `radius` (default: user's learning_radius_km)
-
-**Response (200):**
-```json
-{
-  "count": 25,
-  "next": "http://localhost:8000/api/discover/nearby-learners/?page=2",
-  "previous": null,
-  "radius_km": 5.0,
-  "results": [
-    {
-      "id": 2,
-      "email": "user2@example.com",
-      "full_name": "Jane Smith",
-      "avatar_url": "https://example.com/avatar2.jpg",
-      "bio": "Hello!",
-      "school_name": "University Name",
-      "major": "Computer Science",
-      "year": 2,
-      "distance_km": 0.15,
-      "latitude": 21.028611,
-      "longitude": 105.804917
-    }
-  ]
-}
-```
-
----
-
-## 🤝 Matching
-
-### Connection Requests `/api/matching/requests/`
-
-#### POST `/api/matching/requests/`
-Send a connection request to another user.
-
-**Request:**
-```json
-{
-  "receiver_id": 123,
-  "message": "Hi! Want to study together?"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 1,
-  "sender": {
-    "id": 456,
-    "email": "sender@example.com",
     "full_name": "Alice",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!"
+    "avatar_url": "https://...",
+    "school": 3,
+    "major": "CS",
+    "year": 2
   },
-  "receiver": {
-    "id": 123,
-    "email": "receiver@example.com",
-    "full_name": "Bob",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Engineering",
-    "year": 3,
-    "bio": "Hi there!"
+  "subject": {
+    "id": 20,
+    "code": "CS301",
+    "name_en": "Web Development",
+    "name_vi": "Phát triển Web",
+    "level": "intermediate"
   },
-  "state": "pending",
-  "message": "Hi! Want to study together?",
-  "created_at": "2025-10-24T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z",
-  "accepted_at": null,
-  "rejected_at": null,
-  "can_accept": false,
-  "can_reject": false,
-  "can_message": false
-}
-```
-
-#### GET `/api/matching/requests/`
-List all connection requests (sent and received) with pagination.
-
-**Query Parameters:**
-- `page` - Page number (default: 1)
-- `page_size` - Items per page (default: 10)
-
-**Response (200):**
-```json
-{
-  "count": 25,
-  "next": "http://localhost:8000/api/matching/requests/?page=2",
-  "previous": null,
-  "results": [
+  "session_type": "virtual",
+  "meeting_link": "https://zoom.us/j/123456789",
+  "start_time": "2025-11-05T18:00:00Z",
+  "end_time": "2025-11-05T19:30:00Z",
+  "duration_minutes": 90,
+  "participant_count": 1,
+  "max_participants": 15,
+  "is_full": false,
+  "status": "upcoming",
+  "participants": [
     {
       "id": 1,
-      "sender_name": "Alice",
-      "sender_avatar": "https://example.com/avatar.jpg",
-      "receiver_name": "Bob",
-      "receiver_avatar": "https://example.com/avatar2.jpg",
-      "state": "pending",
-      "message": "Hi! Want to study together?",
-      "created_at": "2025-10-24T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### GET `/api/matching/requests/{id}/`
-Get details of a specific connection request.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "sender": {
-    "id": 456,
-    "email": "sender@example.com",
-    "full_name": "Alice",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!"
-  },
-  "receiver": {
-    "id": 123,
-    "email": "receiver@example.com",
-    "full_name": "Bob",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Engineering",
-    "year": 3,
-    "bio": "Hi there!"
-  },
-  "state": "pending",
-  "message": "Hi! Want to study together?",
-  "created_at": "2025-10-24T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z",
-  "accepted_at": null,
-  "rejected_at": null,
-  "can_accept": true,
-  "can_reject": true,
-  "can_message": false
-}
-```
-
-#### GET `/api/matching/requests/sent/`
-List connection requests sent by current user with pagination.
-
-**Query Parameters:**
-- `state` (optional: pending, accepted, rejected, blocked)
-- `page` - Page number (default: 1)
-- `page_size` - Items per page (default: 10)
-
-**Response (200):**
-```json
-{
-  "count": 15,
-  "next": "http://localhost:8000/api/matching/requests/sent/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "sender_name": "Alice",
-      "sender_avatar": "https://example.com/avatar.jpg",
-      "receiver_name": "Bob",
-      "receiver_avatar": "https://example.com/avatar2.jpg",
-      "state": "pending",
-      "message": "Hi! Want to study together?",
-      "created_at": "2025-10-24T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### GET `/api/matching/requests/received/`
-List connection requests received by current user with pagination.
-
-**Query Parameters:**
-- `state` (optional: pending, accepted, rejected, blocked)
-- `page` - Page number (default: 1)
-- `page_size` - Items per page (default: 10)
-
-**Response (200):**
-```json
-{
-  "count": 12,
-  "next": "http://localhost:8000/api/matching/requests/received/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 2,
-      "sender_name": "Charlie",
-      "sender_avatar": "https://example.com/avatar3.jpg",
-      "receiver_name": "Alice",
-      "receiver_avatar": "https://example.com/avatar.jpg",
-      "state": "pending",
-      "message": "Let's study together!",
-      "created_at": "2025-10-24T09:00:00Z"
-    }
-  ]
-}
-```
-
-#### GET `/api/matching/requests/pending/`
-List all pending requests (both sent and received).
-
-**Response (200):**
-```json
-{
-  "sent": [
-    {
-      "id": 1,
-      "sender_name": "Alice",
-      "sender_avatar": "https://example.com/avatar.jpg",
-      "receiver_name": "Bob",
-      "receiver_avatar": "https://example.com/avatar2.jpg",
-      "state": "pending",
-      "message": "Hi! Want to study together?",
-      "created_at": "2025-10-24T10:00:00Z"
+      "user": {
+        "id": 1,
+        "email": "user@example.com",
+        "full_name": "Alice"
+      },
+      "status": "registered",
+      "check_in_time": null,
+      "check_out_time": null,
+      "duration_minutes": null,
+      "notes": "",
+      "joined_at": "2025-10-30T10:00:00Z"
     }
   ],
-  "received": [
-    {
-      "id": 2,
-      "sender_name": "Charlie",
-      "sender_avatar": "https://example.com/avatar3.jpg",
-      "receiver_name": "Alice",
-      "receiver_avatar": "https://example.com/avatar.jpg",
-      "state": "pending",
-      "message": "Let's study together!",
-      "created_at": "2025-10-24T09:00:00Z"
-    }
-  ]
+  "is_host": true,
+  "is_participant": true,
+  "can_join": false,
+  "created_at": "2025-10-30T10:00:00Z",
+  "updated_at": "2025-10-30T10:00:00Z"
 }
 ```
 
-#### DELETE `/api/matching/requests/{id}/`
-Cancel a sent connection request (only pending requests).
+### GET `/api/sessions/{id}/`
+Get detailed session information.
 
-**Response (204):** No content
+**Response (200):** Same structure as POST response.
 
-#### POST `/api/matching/requests/{id}/accept/`
-Accept a connection request.
+### PUT/PATCH `/api/sessions/{id}/`
+Update session (host only).
+
+**Request:** Same fields as POST, all optional for PATCH.
+
+**Response (200):** Updated session object.
+
+### DELETE `/api/sessions/{id}/`
+Cancel session (host only).
 
 **Response (200):**
 ```json
 {
-  "id": 1,
-  "sender": {
-    "id": 456,
-    "email": "sender@example.com",
-    "full_name": "Alice",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!"
-  },
-  "receiver": {
-    "id": 123,
-    "email": "receiver@example.com",
-    "full_name": "Bob",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Engineering",
-    "year": 3,
-    "bio": "Hi there!"
-  },
-  "state": "accepted",
-  "message": "Hi! Want to study together?",
-  "created_at": "2025-10-24T10:00:00Z",
-  "updated_at": "2025-10-24T10:05:00Z",
-  "accepted_at": "2025-10-24T10:05:00Z",
-  "rejected_at": null,
-  "can_accept": false,
-  "can_reject": false,
-  "can_message": true
+  "message": "Session cancelled successfully."
 }
 ```
 
-#### POST `/api/matching/requests/{id}/reject/`
-Reject a connection request.
+### POST `/api/sessions/{id}/join/`
+Join a study session.
+
+**Request:**
+```json
+{
+  "notes": "Looking forward to this session!"
+}
+```
 
 **Response (200):**
 ```json
 {
-  "id": 1,
-  "sender": {
-    "id": 456,
-    "email": "sender@example.com",
-    "full_name": "Alice",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!"
-  },
-  "receiver": {
-    "id": 123,
-    "email": "receiver@example.com",
-    "full_name": "Bob",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Engineering",
-    "year": 3,
-    "bio": "Hi there!"
-  },
-  "state": "rejected",
-  "message": "Hi! Want to study together?",
-  "created_at": "2025-10-24T10:00:00Z",
-  "updated_at": "2025-10-24T10:05:00Z",
-  "accepted_at": null,
-  "rejected_at": "2025-10-24T10:05:00Z",
-  "can_accept": false,
-  "can_reject": false,
-  "can_message": false
-}
-```
-
-#### POST `/api/matching/requests/{id}/block/`
-Block a connection.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "sender": {
-    "id": 456,
-    "email": "sender@example.com",
-    "full_name": "Alice",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 2,
-    "bio": "Hello!"
-  },
-  "receiver": {
-    "id": 123,
-    "email": "receiver@example.com",
-    "full_name": "Bob",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Engineering",
-    "year": 3,
-    "bio": "Hi there!"
-  },
-  "state": "blocked",
-  "message": "Hi! Want to study together?",
-  "created_at": "2025-10-24T10:00:00Z",
-  "updated_at": "2025-10-24T10:05:00Z",
-  "accepted_at": null,
-  "rejected_at": null,
-  "can_accept": false,
-  "can_reject": false,
-  "can_message": false
-}
-```
-
-### Connections `/api/matching/connections/`
-
-#### GET `/api/matching/connections/`
-List all accepted connections with pagination.
-
-**Query Parameters:**
-- `page` - Page number (default: 1)
-- `page_size` - Items per page (default: 10)
-
-**Response (200):**
-```json
-{
-  "count": 30,
-  "next": "http://localhost:8000/api/matching/connections/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 3,
-      "user": {
-        "id": 123,
-        "email": "bob@example.com",
-        "full_name": "Bob Smith",
-        "avatar_url": "https://example.com/avatar2.jpg",
-        "school": 1,
-        "major": "Computer Science",
-        "year": 3,
-        "bio": "Hi there!"
-      },
-      "connection_state": "accepted",
-      "accepted_at": "2025-10-24T10:05:00Z",
-      "can_message": true,
-      "conversation_id": 1
-    }
-  ]
-}
-```
-
-#### GET `/api/matching/connections/{id}/`
-Get details of a specific connection.
-
-**Response (200):**
-```json
-{
-  "id": 3,
+  "id": 10,
   "user": {
-    "id": 123,
-    "email": "bob@example.com",
-    "full_name": "Bob Smith",
-    "avatar_url": "https://example.com/avatar2.jpg",
-    "school": 1,
-    "major": "Computer Science",
-    "year": 3,
-    "bio": "Hi there!"
+    "id": 5,
+    "email": "student@example.com",
+    "full_name": "Bob"
   },
-  "connection_state": "accepted",
-  "accepted_at": "2025-10-24T10:05:00Z",
-  "can_message": true,
-  "conversation_id": 1
+  "status": "registered",
+  "check_in_time": null,
+  "check_out_time": null,
+  "duration_minutes": null,
+  "notes": "Looking forward to this session!",
+  "joined_at": "2025-10-30T11:00:00Z",
+  "updated_at": "2025-10-30T11:00:00Z"
 }
 ```
 
-#### GET `/api/matching/connections/statistics/`
-Get connection statistics for current user.
+### POST `/api/sessions/{id}/leave/`
+Leave a study session.
 
 **Response (200):**
 ```json
 {
-  "sent_pending": 5,
-  "received_pending": 3,
-  "accepted_connections": 12,
-  "total_requests": 8
+  "message": "You have left the session."
 }
 ```
 
-#### GET `/api/matching/connections/status/{user_id}/`
-Check connection status with another user.
+### POST `/api/sessions/{id}/check_in/`
+Check in to a session (marks attendance).
 
 **Response (200):**
 ```json
 {
-  "connected": true,
-  "can_message": true,
-  "user1_sent": true,
-  "user2_sent": false,
-  "user1_request_state": "accepted",
-  "user2_request_state": null
+  "id": 10,
+  "user": {
+    "id": 5,
+    "email": "student@example.com",
+    "full_name": "Bob"
+  },
+  "status": "attended",
+  "check_in_time": "2025-11-01T14:05:00Z",
+  "check_out_time": null,
+  "duration_minutes": null,
+  "notes": "",
+  "joined_at": "2025-10-30T11:00:00Z",
+  "updated_at": "2025-11-01T14:05:00Z"
 }
 ```
 
----
+### POST `/api/sessions/{id}/check_out/`
+Check out of a session (records study duration).
 
-## 💬 Chat `/api/chat/`
+**Response (200):**
+```json
+{
+  "id": 10,
+  "user": {
+    "id": 5,
+    "email": "student@example.com",
+    "full_name": "Bob"
+  },
+  "status": "attended",
+  "check_in_time": "2025-11-01T14:05:00Z",
+  "check_out_time": "2025-11-01T16:00:00Z",
+  "duration_minutes": 115,
+  "notes": "",
+  "joined_at": "2025-10-30T11:00:00Z",
+  "updated_at": "2025-11-01T16:00:00Z"
+}
+```
 
-Real-time chat feature for accepted connections. Supports both REST API (for history) and WebSocket (for real-time messaging).
+### GET `/api/sessions/{id}/participants/`
+List all participants of a session.
 
-### Conversations `/api/chat/conversations/`
+**Response (200):**
+```json
+[
+  {
+    "id": 10,
+    "user": {
+      "id": 5,
+      "email": "student@example.com",
+      "full_name": "Bob",
+      "avatar_url": "https://...",
+      "school": 3,
+      "major": "CS",
+      "year": 2
+    },
+    "status": "attended",
+    "check_in_time": "2025-11-01T14:05:00Z",
+    "check_out_time": "2025-11-01T16:00:00Z",
+    "duration_minutes": 115,
+    "notes": "",
+    "joined_at": "2025-10-30T11:00:00Z",
+    "updated_at": "2025-11-01T16:00:00Z"
+  }
+]
+```
 
-#### GET `/api/chat/conversations/by-connection/?connection_id={id}`
-Get or create conversation by connection ID. Auto-creates if doesn't exist.
+### GET `/api/sessions/my_sessions/`
+List user's sessions (hosting or attending).
 
 **Query Parameters:**
-- `connection_id` (required) - Connection ID
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "connection": 5,
-  "participants": [...],
-  "other_participant": {...},
-  "last_message": {...},
-  "unread_count": 0,
-  "last_message_at": null,
-  "created_at": "2025-10-25T10:00:00Z"
-}
-```
-
-#### GET `/api/chat/conversations/`
-List all conversations for current user.
+- `role` - Filter by role: `hosting`, `attending` (default: both)
 
 **Response (200):**
 ```json
 [
   {
     "id": 1,
-    "other_participant": {
-      "id": 2,
-      "email": "user2@example.com",
-      "full_name": "Jane Doe",
-      "avatar_url": "https://example.com/avatar2.jpg"
-    },
-    "last_message_preview": {
-      "content": "Hello! How are you?",
-      "sender_id": 2,
-      "created_at": "2025-10-25T10:00:00Z"
-    },
-    "last_message_at": "2025-10-25T10:00:00Z",
-    "unread_count": 3
+    "title": "Calculus Study Group",
+    "description": "Reviewing chapters 5-7",
+    "host": { /* host user object */ },
+    "subject": { /* subject object */ },
+    "session_type": "hybrid",
+    "location_name": "Library Room 301",
+    "start_time": "2025-11-01T14:00:00Z",
+    "end_time": "2025-11-01T16:00:00Z",
+    "duration_minutes": 120,
+    "participant_count": 5,
+    "max_participants": 10,
+    "is_full": false,
+    "status": "upcoming",
+    "is_host": true,
+    "is_participant": true,
+    "created_at": "2025-10-25T10:00:00Z"
   }
 ]
 ```
 
-#### GET `/api/chat/conversations/{id}/`
-Get conversation details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "connection": 5,
-  "participants": [
-    {
-      "id": 1,
-      "email": "user1@example.com",
-      "full_name": "John Doe",
-      "avatar_url": "https://example.com/avatar1.jpg"
-    },
-    {
-      "id": 2,
-      "email": "user2@example.com",
-      "full_name": "Jane Doe",
-      "avatar_url": "https://example.com/avatar2.jpg"
-    }
-  ],
-  "other_participant": {
-    "id": 2,
-    "email": "user2@example.com",
-    "full_name": "Jane Doe",
-    "avatar_url": "https://example.com/avatar2.jpg"
-  },
-  "last_message": {
-    "id": 123,
-    "sender_id": 2,
-    "sender_name": "Jane Doe",
-    "content": "Hello!",
-    "is_read": false,
-    "created_at": "2025-10-25T10:00:00Z"
-  },
-  "unread_count": 3,
-  "last_message_at": "2025-10-25T10:00:00Z",
-  "created_at": "2025-10-24T08:00:00Z"
-}
-```
-
-#### GET `/api/chat/conversations/{id}/messages/`
-Get message history with pagination.
+### GET `/api/sessions/nearby/`
+Find nearby in-person study sessions.
 
 **Query Parameters:**
-- `page` - Page number (default: 1)
-- `page_size` - Messages per page (default: 50)
+- `radius_km` - Search radius in km (default: 5)
+- `session_type` - Filter by type
+
+**Response (200):** Array of session objects, sorted by distance.
+
+**Note:** Requires user location to be set.
+
+---
+
+## 👥 Study Groups `/api/groups/`
+
+Create and manage persistent learning communities.
+
+### Key Features
+- Create public, private, or invite-only groups
+- Role-based permissions (admin, moderator, member)
+- Member management (invite, accept, promote, remove)
+- Real-time group chat via WebSocket
+- Location-based group discovery
+- Subject associations
+
+### GET `/api/groups/`
+List study groups with optional filters.
+
+**Query Parameters:**
+- `status` - Filter by status: `active`, `inactive`, `archived`
+- `privacy` - Filter by privacy: `public`, `private`, `invite_only`
+- `subject` - Filter by subject ID
+- `school` - Filter by school ID
+- `page`, `page_size` - Pagination
 
 **Response (200):**
 ```json
 {
-  "count": 150,
-  "next": "http://localhost:8000/api/chat/conversations/1/messages/?page=2",
+  "count": 30,
+  "next": "http://localhost:8000/api/groups/?page=2",
   "previous": null,
   "results": [
     {
-      "id": 123,
-      "sender_id": 1,
-      "sender_name": "John Doe",
-      "sender_avatar": "https://example.com/avatar1.jpg",
-      "content": "Hello! How are you?",
-      "is_read": true,
-      "read_at": "2025-10-25T10:05:00Z",
-      "created_at": "2025-10-25T10:00:00Z"
+      "id": 1,
+      "name": "Machine Learning Study Group",
+      "description": "Weekly discussions on ML algorithms",
+      "avatar_url": "https://...",
+      "created_by": {
+        "id": 5,
+        "email": "admin@example.com",
+        "full_name": "Jane Smith",
+        "avatar_url": "https://...",
+        "school": 3,
+        "major": "Computer Science",
+        "year": 4
+      },
+      "school": {
+        "id": 3,
+        "name": "Tech University",
+        "short_name": "TechU"
+      },
+      "subjects": [
+        {
+          "id": 25,
+          "code": "CS401",
+          "name_en": "Machine Learning",
+          "name_vi": "Học máy",
+          "level": "advanced"
+        }
+      ],
+      "privacy": "public",
+      "member_count": 12,
+      "max_members": 20,
+      "is_full": false,
+      "status": "active",
+      "is_member": true,
+      "is_admin": false,
+      "created_at": "2025-09-15T10:00:00Z"
     }
   ]
 }
 ```
 
-#### POST `/api/chat/conversations/{id}/mark_read/`
-Mark messages as read.
+### POST `/api/groups/`
+Create a new study group.
 
 **Request:**
 ```json
 {
-  "message_ids": [123, 124, 125]
-}
-```
-*Note: If `message_ids` not provided, marks all unread messages in conversation.*
-
-**Response (200):**
-```json
-{
-  "message": "Marked 3 message(s) as read",
-  "marked_count": 3
-}
-```
-
-### Messages `/api/chat/messages/`
-
-#### POST `/api/chat/messages/`
-Send a message (HTTP fallback).
-
-**Request:**
-```json
-{
-  "conversation": 1,
-  "content": "Hello! How are you?"
+  "name": "Data Structures Study Group",
+  "description": "Collaborative learning for CS201",
+  "avatar_url": "https://...",
+  "school": 3,
+  "subject_ids": [15, 16, 17],
+  "privacy": "public",
+  "max_members": 25,
+  "latitude": 10.762622,
+  "longitude": 106.660172
 }
 ```
 
 **Response (201):**
 ```json
 {
-  "id": 123,
-  "conversation": 1,
-  "sender": {
-    "id": 1,
-    "email": "user1@example.com",
-    "full_name": "John Doe",
-    "avatar_url": "https://example.com/avatar1.jpg"
+  "id": 50,
+  "name": "Data Structures Study Group",
+  "description": "Collaborative learning for CS201",
+  "avatar_url": "https://...",
+  "created_by": { /* creator user object */ },
+  "school": { /* school object */ },
+  "geom_point": {
+    "type": "Point",
+    "coordinates": [106.660172, 10.762622]
   },
-  "content": "Hello! How are you?",
-  "read_at": null,
-  "is_read": false,
-  "created_at": "2025-10-25T10:00:00Z",
-  "updated_at": "2025-10-25T10:00:00Z"
+  "subjects": [ /* array of subject objects */ ],
+  "privacy": "public",
+  "max_members": 25,
+  "member_count": 1,
+  "is_full": false,
+  "status": "active",
+  "memberships": [
+    {
+      "id": 1,
+      "user": { /* creator user object */ },
+      "role": "admin",
+      "status": "active",
+      "invited_by": null,
+      "joined_at": "2025-10-30T12:00:00Z",
+      "updated_at": "2025-10-30T12:00:00Z",
+      "left_at": null
+    }
+  ],
+  "is_member": true,
+  "is_admin": true,
+  "is_moderator": true,
+  "can_join": false,
+  "user_membership": { /* current user's membership */ },
+  "created_at": "2025-10-30T12:00:00Z",
+  "updated_at": "2025-10-30T12:00:00Z"
 }
 ```
 
-### WebSocket (Real-time)
+### GET `/api/groups/{id}/`
+Get detailed group information.
 
-**Connection URL:**
+**Response (200):** Same structure as POST response.
+
+### PUT/PATCH `/api/groups/{id}/`
+Update group (admin only).
+
+**Request:** Same fields as POST, all optional for PATCH.
+
+**Response (200):** Updated group object.
+
+### DELETE `/api/groups/{id}/`
+Archive group (admin only).
+
+**Response (200):**
+```json
+{
+  "message": "Group archived successfully."
+}
 ```
-ws://localhost:8000/ws/chat/{conversation_id}/?token={access_token}
+
+### POST `/api/groups/{id}/join/`
+Join or request to join a group.
+
+**Behavior depends on privacy setting:**
+- **Public**: Immediately joins
+- **Private**: Creates pending request (requires admin approval)
+- **Invite Only**: Only works if user has pending invitation
+
+**Response (200):**
+```json
+{
+  "message": "You have joined the group.",
+  "membership": {
+    "id": 25,
+    "user": { /* user object */ },
+    "role": "member",
+    "status": "active",
+    "invited_by": null,
+    "joined_at": "2025-10-30T13:00:00Z",
+    "updated_at": "2025-10-30T13:00:00Z",
+    "left_at": null
+  }
+}
+```
+
+### POST `/api/groups/{id}/leave/`
+Leave a group.
+
+**Response (200):**
+```json
+{
+  "message": "You have left the group."
+}
+```
+
+**Note:** Cannot leave if you're the last admin. Promote someone else first.
+
+### POST `/api/groups/{id}/invite/`
+Invite a user to join the group (admin/moderator only).
+
+**Request:**
+```json
+{
+  "user_id": 42
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 30,
+  "user": { /* invited user object */ },
+  "role": "member",
+  "status": "invited",
+  "invited_by": { /* inviter user object */ },
+  "joined_at": "2025-10-30T14:00:00Z",
+  "updated_at": "2025-10-30T14:00:00Z",
+  "left_at": null
+}
+```
+
+### GET `/api/groups/{id}/members/`
+List all group members.
+
+**Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "user": {
+      "id": 5,
+      "email": "member@example.com",
+      "full_name": "John Doe",
+      "avatar_url": "https://...",
+      "school": 3,
+      "major": "CS",
+      "year": 2
+    },
+    "role": "admin",
+    "status": "active",
+    "invited_by": null,
+    "joined_at": "2025-09-15T10:00:00Z",
+    "updated_at": "2025-09-15T10:00:00Z",
+    "left_at": null
+  }
+]
+```
+
+**Note:** Non-members only see active members. Members see all memberships including pending.
+
+### GET `/api/groups/my_groups/`
+List groups the current user is a member of.
+
+**Response (200):** Array of group objects.
+
+### GET `/api/groups/nearby/`
+Find nearby study groups.
+
+**Query Parameters:**
+- `radius_km` - Search radius in km (default: 10)
+- `subject` - Filter by subject ID
+
+**Response (200):** Array of group objects, sorted by distance.
+
+**Note:** Requires user location to be set.
+
+---
+
+## 🔧 Group Membership Management `/api/groups/memberships/`
+
+Manage group memberships and roles.
+
+### GET `/api/groups/memberships/{id}/`
+Get membership details.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "group": { /* group object */ },
+  "user": { /* user object */ },
+  "role": "moderator",
+  "status": "active",
+  "invited_by": { /* inviter user object */ },
+  "joined_at": "2025-09-15T10:00:00Z",
+  "updated_at": "2025-10-15T10:00:00Z",
+  "left_at": null
+}
+```
+
+### PATCH `/api/groups/memberships/{id}/role/`
+Update member's role (admin only).
+
+**Request:**
+```json
+{
+  "role": "moderator"
+}
+```
+
+**Roles:** `admin`, `moderator`, `member`
+
+**Response (200):** Updated membership object.
+
+**Note:** Cannot demote the last admin.
+
+### POST `/api/groups/memberships/{id}/accept/`
+Accept a join request (admin only).
+
+**Response (200):** Membership object with status="active".
+
+### POST `/api/groups/memberships/{id}/reject/`
+Reject a join request (admin only).
+
+**Response (200):**
+```json
+{
+  "message": "Join request rejected."
+}
+```
+
+### POST `/api/groups/memberships/{id}/remove/`
+Remove a member from group (admin only).
+
+**Response (200):**
+```json
+{
+  "message": "Member removed from group."
+}
+```
+
+**Note:** Cannot remove the last admin.
+
+---
+
+## 💬 Group Messages `/api/groups/{group_id}/messages/`
+
+Send and receive messages in group conversations.
+
+### GET `/api/groups/{group_id}/messages/`
+List group messages with pagination.
+
+**Response (200):**
+```json
+[
+  {
+    "id": 100,
+    "conversation": 5,
+    "sender": {
+      "id": 10,
+      "email": "user@example.com",
+      "full_name": "John Doe",
+      "avatar_url": "https://...",
+      "school": 3,
+      "major": "CS",
+      "year": 2
+    },
+    "content": "Hey everyone, let's meet tomorrow!",
+    "is_read": true,
+    "created_at": "2025-10-30T15:00:00Z"
+  }
+]
+```
+
+### POST `/api/groups/{group_id}/messages/`
+Send a message to the group.
+
+**Request:**
+```json
+{
+  "content": "Sounds good! I'll be there."
+}
+```
+
+**Response (201):** Message object.
+
+### POST `/api/groups/{group_id}/messages/mark_read/`
+Mark messages as read.
+
+**Request:**
+```json
+{
+  "message_ids": [100, 101, 102]
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "3 messages marked as read."
+}
+```
+
+---
+
+## 🔌 Group Chat WebSocket
+
+Real-time messaging for study groups.
+
+### Connection
+```
+ws://localhost:8000/ws/groups/{group_id}/chat/?token={access_token}
 ```
 
 Or use Authorization header: `Authorization: Bearer {access_token}`
 
-#### Events to Send (Client → Server)
+### Events to Send (Client → Server)
 
 **1. Send Message:**
 ```json
 {
   "type": "chat_message",
-  "content": "Hello!"
+  "content": "Hello everyone!"
 }
 ```
 
@@ -993,34 +1011,34 @@ Or use Authorization header: `Authorization: Bearer {access_token}`
 }
 ```
 
-**3. Mark as Read:**
+**3. Mark Messages as Read:**
 ```json
 {
   "type": "message_read",
-  "message_ids": [123, 124]
+  "message_ids": [100, 101, 102]
 }
 ```
 
-#### Events to Receive (Server → Client)
+### Events to Receive (Server → Client)
 
-**1. Connection Success:**
+**1. Connection Established:**
 ```json
 {
   "type": "connection_established",
-  "message": "Connected to chat"
+  "message": "Connected to group chat"
 }
 ```
 
-**2. New Message:**
+**2. Chat Message:**
 ```json
 {
   "type": "chat_message",
-  "message_id": 123,
-  "sender_id": 2,
-  "sender_name": "Jane Doe",
-  "sender_avatar": "https://example.com/avatar2.jpg",
-  "content": "Hello!",
-  "created_at": "2025-10-25T10:00:00Z"
+  "message_id": 105,
+  "sender_id": 10,
+  "sender_name": "John Doe",
+  "sender_avatar": "https://...",
+  "content": "Hello everyone!",
+  "created_at": "2025-10-30T16:00:00Z"
 }
 ```
 
@@ -1028,8 +1046,8 @@ Or use Authorization header: `Authorization: Bearer {access_token}`
 ```json
 {
   "type": "typing_indicator",
-  "user_id": 2,
-  "user_name": "Jane Doe",
+  "user_id": 10,
+  "user_name": "John Doe",
   "is_typing": true
 }
 ```
@@ -1038,9 +1056,9 @@ Or use Authorization header: `Authorization: Bearer {access_token}`
 ```json
 {
   "type": "messages_read",
-  "user_id": 2,
-  "message_ids": [123, 124],
-  "read_at": "2025-10-25T10:05:00Z"
+  "user_id": 15,
+  "message_ids": [100, 101, 102],
+  "read_at": "2025-10-30T16:05:00Z"
 }
 ```
 
@@ -1054,780 +1072,225 @@ Or use Authorization header: `Authorization: Bearer {access_token}`
 
 ---
 
-## 🏫 Schools `/api/schools/`
+## 🚀 Quick Start Examples
 
-### GET `/api/schools/`
-List schools with pagination and filters.
+### Example 1: Create and Join a Study Session
 
-**Query Parameters:**
-- `search` - Search by name, short_name, city, or address
-- `city` - Filter by city name
-- `lat`, `lng`, `radius` - Proximity search (radius in km, default: 10)
-- `ordering` - Order by: name, city, created_at (prefix with - for descending)
-- `page`, `page_size` - Pagination
+```javascript
+// 1. Create a virtual study session
+const session = await fetch('/api/sessions/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    title: 'JavaScript Fundamentals',
+    description: 'Learning async/await and promises',
+    subject: 30,
+    session_type: 'virtual',
+    meeting_link: 'https://meet.google.com/abc-defg-hij',
+    start_time: '2025-11-10T19:00:00Z',
+    duration_minutes: 120,
+    max_participants: 8
+  })
+}).then(r => r.json());
 
-**Response (200):**
-```json
-{
-  "count": 50,
-  "next": "http://localhost:8000/api/schools/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "name": "Harvard University",
-      "short_name": "Harvard",
-      "city": 1,
-      "student_count": 150
-    }
-  ]
-}
-```
-
-### POST `/api/schools/`
-Create a new school.
-
-**Request:**
-```json
-{
-  "name": "Harvard University",
-  "short_name": "Harvard",
-  "address": "Cambridge, MA",
-  "city": 1,
-  "latitude": 42.3744,
-  "longitude": -71.1169,
-  "website": "https://www.harvard.edu",
-  "email": "info@harvard.edu",
-  "phone": "+1-617-495-1000"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 1,
-  "name": "Harvard University",
-  "short_name": "Harvard",
-  "address": "Cambridge, MA",
-  "city": 1,
-  "website": "https://www.harvard.edu",
-  "email": "info@harvard.edu",
-  "phone": "+1-617-495-1000"
-}
-```
-
-### GET `/api/schools/{id}/`
-Get school details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Harvard University",
-  "short_name": "Harvard",
-  "address": "Cambridge, MA",
-  "city": 1,
-  "latitude": 42.3744,
-  "longitude": -71.1169,
-  "website": "https://www.harvard.edu",
-  "email": "info@harvard.edu",
-  "phone": "+1-617-495-1000",
-  "created_at": "2025-10-20T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z",
-  "student_count": 150
-}
-```
-
-### PUT/PATCH `/api/schools/{id}/`
-Update school information.
-
-**Request:**
-```json
-{
-  "name": "Harvard University - Updated",
-  "website": "https://www.harvard.edu"
-}
-```
-
-**Response (200):** Same structure as GET
-
-### DELETE `/api/schools/{id}/`
-Delete a school.
-
-**Response (204):** No content
-
-### GET `/api/schools/search/location/`
-Search schools by geographic location.
-
-**Query Parameters (required):**
-- `lat` - Latitude
-- `lng` - Longitude
-- `radius` - Radius in km (default: 10)
-
-**Response (200):**
-```json
-[
+// 2. Find nearby in-person sessions
+const nearbySessions = await fetch(
+  '/api/sessions/nearby/?radius_km=3&session_type=in_person',
   {
-    "id": 1,
-    "name": "Harvard University",
-    "short_name": "Harvard",
-    "address": "Cambridge, MA",
-    "city": 1,
-    "latitude": 42.3744,
-    "longitude": -71.1169,
-    "website": "https://www.harvard.edu",
-    "email": "info@harvard.edu",
-    "phone": "+1-617-495-1000",
-    "created_at": "2025-10-20T10:00:00Z",
-    "updated_at": "2025-10-24T10:00:00Z",
-    "student_count": 150,
-    "distance_km": 2.5
+    headers: { 'Authorization': `Bearer ${token}` }
   }
-]
+).then(r => r.json());
+
+// 3. Join a session
+await fetch(`/api/sessions/${sessionId}/join/`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ notes: 'Excited to learn!' })
+});
+
+// 4. Check in to session
+await fetch(`/api/sessions/${sessionId}/check_in/`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
 ```
 
-### GET `/api/schools/search/city/`
-List schools by city.
+### Example 2: Create and Manage a Study Group
 
-**Query Parameters (required):**
-- `city` - City name
+```javascript
+// 1. Create a study group
+const group = await fetch('/api/groups/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Algorithms & Data Structures',
+    description: 'Weekly problem-solving sessions',
+    subject_ids: [20, 21],
+    privacy: 'public',
+    max_members: 15
+  })
+}).then(r => r.json());
 
-**Response (200):**
-```json
-[
-  {
-    "id": 1,
-    "name": "Harvard University",
-    "short_name": "Harvard",
-    "city": 1,
-    "student_count": 150
+// 2. Join a group
+await fetch(`/api/groups/${groupId}/join/`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+// 3. Invite a user (admin/moderator only)
+await fetch(`/api/groups/${groupId}/invite/`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ user_id: 42 })
+});
+
+// 4. Promote member to moderator (admin only)
+await fetch(`/api/groups/memberships/${membershipId}/role/`, {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ role: 'moderator' })
+});
+```
+
+### Example 3: Connect to Group Chat WebSocket
+
+```javascript
+// Connect to group chat
+const ws = new WebSocket(
+  `ws://localhost:8000/ws/groups/${groupId}/chat/?token=${token}`
+);
+
+ws.onopen = () => {
+  console.log('Connected to group chat');
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  switch (data.type) {
+    case 'connection_established':
+      console.log('Connection established');
+      break;
+
+    case 'chat_message':
+      console.log(`${data.sender_name}: ${data.content}`);
+      displayMessage(data);
+      break;
+
+    case 'typing_indicator':
+      if (data.is_typing) {
+        showTypingIndicator(data.user_name);
+      } else {
+        hideTypingIndicator(data.user_name);
+      }
+      break;
+
+    case 'messages_read':
+      updateReadReceipts(data.message_ids, data.user_id);
+      break;
+
+    case 'error':
+      console.error('WebSocket error:', data.message);
+      break;
   }
-]
+};
+
+// Send a message
+const sendMessage = (content) => {
+  ws.send(JSON.stringify({
+    type: 'chat_message',
+    content: content
+  }));
+};
+
+// Send typing indicator
+const sendTypingIndicator = (isTyping) => {
+  ws.send(JSON.stringify({
+    type: 'typing_indicator',
+    is_typing: isTyping
+  }));
+};
+
+// Mark messages as read
+const markMessagesRead = (messageIds) => {
+  ws.send(JSON.stringify({
+    type: 'message_read',
+    message_ids: messageIds
+  }));
+};
 ```
 
 ---
 
-## 🌆 Cities `/api/cities/`
-
-### GET `/api/cities/`
-List cities with pagination and filters.
-
-**Query Parameters:**
-- `search` - Search by name
-- `lat`, `lng`, `radius` - Proximity search (radius in km, default: 50)
-- `ordering` - Order by: name (prefix with - for descending)
-- `page`, `page_size` - Pagination
-
-**Response (200):**
-```json
-{
-  "count": 30,
-  "next": "http://localhost:8000/api/cities/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "name": "Boston",
-      "school_count": 25
-    }
-  ]
-}
-```
-
-### POST `/api/cities/`
-Create a new city.
-
-**Request:**
-```json
-{
-  "name": "Boston",
-  "latitude": 42.3601,
-  "longitude": -71.0589
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 1,
-  "name": "Boston"
-}
-```
-
-### GET `/api/cities/{id}/`
-Get city details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Boston",
-  "latitude": 42.3601,
-  "longitude": -71.0589,
-  "school_count": 25
-}
-```
-
-### PUT/PATCH `/api/cities/{id}/`
-Update city information.
-
-**Request:**
-```json
-{
-  "name": "Boston - Updated"
-}
-```
-
-**Response (200):** Same structure as GET
-
-### DELETE `/api/cities/{id}/`
-Delete a city.
-
-**Response (204):** No content
-
-### GET `/api/cities/search/location/`
-Search cities by geographic location.
-
-**Query Parameters (required):**
-- `lat` - Latitude
-- `lng` - Longitude
-- `radius` - Radius in km (default: 50)
-
-**Response (200):**
-```json
-[
-  {
-    "id": 1,
-    "name": "Boston",
-    "latitude": 42.3601,
-    "longitude": -71.0589,
-    "school_count": 25,
-    "distance_km": 5.2
-  }
-]
-```
-
----
-
-## 📚 Subjects `/api/subjects/`
-
-### GET `/api/subjects/`
-List subjects with pagination and filters.
-  
-**Query Parameters:**
-- `search` - Search by code, name_vi, or name_en
-- `level` - Filter by level (beginner, intermediate, advanced, expert)
-- `ordering` - Order by: code, name_en, created_at (prefix with - for descending)
-- `page`, `page_size` - Pagination
-
-**Response (200):**
-```json
-{
-  "count": 100,
-  "next": "http://localhost:8000/api/subjects/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "code": "CS101",
-      "name_vi": "Lập trình cơ bản",
-      "name_en": "Introduction to Programming",
-      "level": "beginner",
-      "user_count": 45
-    }
-  ]
-}
-```
-
-### POST `/api/subjects/`
-Create a new subject.
-
-**Request:**
-```json
-{
-  "code": "CS101",
-  "name_vi": "Lập trình cơ bản",
-  "name_en": "Introduction to Programming",
-  "level": "beginner"
-}
-```
-
-**Response (201):**
-```json
-{
-  "code": "CS101",
-  "name_vi": "Lập trình cơ bản",
-  "name_en": "Introduction to Programming",
-  "level": "beginner"
-}
-```
-
-### GET `/api/subjects/{id}/`
-Get subject details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "code": "CS101",
-  "name_vi": "Lập trình cơ bản",
-  "name_en": "Introduction to Programming",
-  "level": "beginner",
-  "created_at": "2025-10-20T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z",
-  "user_count": 45,
-  "learners_count": 30,
-  "teachers_count": 15
-}
-```
-
-### PUT/PATCH `/api/subjects/{id}/`
-Update subject information.
-
-**Request:**
-```json
-{
-  "name_en": "Introduction to Programming - Updated",
-  "level": "intermediate"
-}
-```
-
-**Response (200):** Same structure as POST
-
-### DELETE `/api/subjects/{id}/`
-Delete a subject.
-
-**Response (204):** No content
-
----
-
-## 📖 User Subjects `/api/user-subjects/`
-
-### GET `/api/user-subjects/`
-List current user's subjects.
-
-**Query Parameters:**
-- `search` - Search by subject code, name_vi, or name_en
-- `level` - Filter by user's level (beginner, intermediate, advanced, expert)
-- `intent` - Filter by intent (learn, teach, both)
-- `ordering` - Order by: level, intent, created_at (prefix with - for descending)
-- `page`, `page_size` - Pagination
-
-**Response (200):**
-```json
-{
-  "count": 15,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "subject": 1,
-      "subject_code": "CS101",
-      "subject_name_en": "Introduction to Programming",
-      "level": "intermediate",
-      "intent": "learn"
-    }
-  ]
-}
-```
-
-### POST `/api/user-subjects/`
-Add a subject to user's learning list.
-
-**Request:**
-```json
-{
-  "subject": 1,
-  "level": "intermediate",
-  "intent": "learn",
-  "note": "Studying for exam"
-}
-```
-
-**Response (201):**
-```json
-{
-  "subject": 1,
-  "level": "intermediate",
-  "intent": "learn",
-  "note": "Studying for exam"
-}
-```
-
-### GET `/api/user-subjects/{id}/`
-Get user subject details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user": 1,
-  "user_email": "user@example.com",
-  "user_full_name": "John Doe",
-  "subject": 1,
-  "subject_code": "CS101",
-  "subject_name_vi": "Lập trình cơ bản",
-  "subject_name_en": "Introduction to Programming",
-  "subject_level": "beginner",
-  "level": "intermediate",
-  "intent": "learn",
-  "note": "Studying for exam",
-  "created_at": "2025-10-20T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z"
-}
-```
-
-### PUT/PATCH `/api/user-subjects/{id}/`
-Update user subject.
-
-**Request:**
-```json
-{
-  "level": "advanced",
-  "note": "Preparing for final exam"
-}
-```
-
-**Response (200):** Same structure as POST
-
-### DELETE `/api/user-subjects/{id}/`
-Remove subject from user's list.
-
-**Response (204):** No content
-
----
-
-## 🎯 Goals `/api/goals/`
-
-### GET `/api/goals/`
-List goals with pagination and filters.
-
-**Query Parameters:**
-- `search` - Search by code or name
-- `type` - Filter by type (daily, weekly, monthly, yearly, milestone)
-- `ordering` - Order by: code, name, type, created_at (prefix with - for descending)
-- `page`, `page_size` - Pagination
-
-**Response (200):**
-```json
-{
-  "count": 50,
-  "next": "http://localhost:8000/api/goals/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "code": "STUDY_HOURS",
-      "name": "Study Hours Per Day",
-      "type": "daily",
-      "user_count": 120
-    }
-  ]
-}
-```
-
-### POST `/api/goals/`
-Create a new goal.
-
-**Request:**
-```json
-{
-  "code": "STUDY_HOURS",
-  "name": "Study Hours Per Day",
-  "type": "daily"
-}
-```
-
-**Response (201):**
-```json
-{
-  "code": "STUDY_HOURS",
-  "name": "Study Hours Per Day",
-  "type": "daily"
-}
-```
-
-### GET `/api/goals/{id}/`
-Get goal details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "code": "STUDY_HOURS",
-  "name": "Study Hours Per Day",
-  "type": "daily",
-  "created_at": "2025-10-20T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z",
-  "user_count": 120,
-  "avg_target_value": 4.5
-}
-```
-
-### PUT/PATCH `/api/goals/{id}/`
-Update goal information.
-
-**Request:**
-```json
-{
-  "name": "Study Hours Per Day - Updated"
-}
-```
-
-**Response (200):** Same structure as POST
-
-### DELETE `/api/goals/{id}/`
-Delete a goal.
-
-**Response (204):** No content
-
----
-
-## ✅ User Goals `/api/user-goals/`
-
-### GET `/api/user-goals/`
-List current user's goals.
-
-**Query Parameters:**
-- `search` - Search by goal code or name
-- `type` - Filter by goal type (daily, weekly, monthly, yearly, milestone)
-- `ordering` - Order by: target_value, target_date, created_at (prefix with - for descending)
-- `page`, `page_size` - Pagination
-
-**Response (200):**
-```json
-{
-  "count": 8,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "goal": 1,
-      "goal_code": "STUDY_HOURS",
-      "goal_name": "Study Hours Per Day",
-      "target_value": 5.0,
-      "target_date": "2025-12-31"
-    }
-  ]
-}
-```
-
-### POST `/api/user-goals/`
-Add a goal to user's list.
-
-**Request:**
-```json
-{
-  "goal": 1,
-  "target_value": 5.0,
-  "target_date": "2025-12-31"
-}
-```
-
-**Response (201):**
-```json
-{
-  "goal": 1,
-  "target_value": 5.0,
-  "target_date": "2025-12-31"
-}
-```
-
-### GET `/api/user-goals/{id}/`
-Get user goal details.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user": 1,
-  "user_email": "user@example.com",
-  "user_full_name": "John Doe",
-  "goal": 1,
-  "goal_code": "STUDY_HOURS",
-  "goal_name": "Study Hours Per Day",
-  "goal_type": "daily",
-  "target_value": 5.0,
-  "target_date": "2025-12-31",
-  "created_at": "2025-10-20T10:00:00Z",
-  "updated_at": "2025-10-24T10:00:00Z"
-}
-```
-
-### PUT/PATCH `/api/user-goals/{id}/`
-Update user goal.
-
-**Request:**
-```json
-{
-  "target_value": 6.0,
-  "target_date": "2025-12-31"
-}
-```
-
-**Response (200):** Same structure as POST
-
-### DELETE `/api/user-goals/{id}/`
-Remove goal from user's list.
-
-**Response (204):** No content
-
----
-
-## Common Query Parameters
-
-### Pagination (all list endpoints)
-- `page` - Page number (default: 1)
-- `page_size` - Items per page (default: 10)
-
-### Common Filters
-- **Schools**: `search`, `city`, `lat`, `lng`, `radius`, `ordering`
-- **Cities**: `search`, `lat`, `lng`, `radius`, `ordering`
-- **Subjects**: `search`, `level`, `ordering`
-- **User Subjects**: `search`, `level`, `intent`, `ordering`
-- **Goals**: `search`, `type`, `ordering`
-- **User Goals**: `search`, `type`, `ordering`
-- **Connection Requests**: `state` (pending, accepted, rejected, blocked), `page`, `page_size` (pagination)
-- **Connections**: `page`, `page_size` (pagination)
-- **Chat Messages**: `page`, `page_size` (pagination)
-- **Conversations**: `page`, `page_size` (pagination)
-
----
-
-## Important Notes
-
-### Authentication
-- All endpoints require JWT authentication except `/api/auth/register/` and `/api/auth/login/`
-- JWT tokens have the following lifetimes:
-  - Access token: 5 minutes (configurable)
-  - Refresh token: 24 hours (configurable)
-- Use refresh token to get new access token via `/api/auth/token/refresh/`
-
-### Location Tracking
-- Location is saved to history if:
-  - User moved **more than 100 meters** OR
-  - **More than 15 minutes** have passed since last update
-- First location is always saved to history
-- Current location is always updated in `User.geom_last_point`
-
-### Discover Nearby Learners
-- Excludes current user
-- Excludes already connected users
-- Excludes users with existing connection requests (any state)
-- Uses user's `learning_radius_km` if radius parameter not specified
-- Results ordered by distance (nearest first)
-
-### Matching System
-
-**Connection States:**
-```
-pending → accepted (can message immediately)
-       ↘ rejected
-       ↘ blocked
-```
+## 📝 Additional Notes
+
+### Study Sessions
+
+**Session States:**
+- `upcoming` - Session hasn't started yet
+- `in_progress` - Session is currently active
+- `completed` - Session has ended
+- `cancelled` - Session was cancelled by host
+
+**Participant States:**
+- `registered` - Signed up but not checked in
+- `attended` - Checked in (may or may not have checked out)
+- `no_show` - Registered but didn't attend
+- `cancelled` - Participant cancelled their registration
+
+**Permissions:**
+- Host can update/cancel session
+- Participants can leave anytime before check-in
+- Check-in available only for registered participants
+- Check-out available only for checked-in participants
+
+**Recurrence:**
+- Sessions can repeat daily, weekly, or monthly
+- Requires recurrence_end_date when pattern is set
+- Future: Individual recurring instances can be managed separately
+
+### Study Groups
+
+**Privacy Levels:**
+- `public` - Anyone can see and join immediately
+- `private` - Anyone can see, but joining requires admin approval
+- `invite_only` - Only visible to members, invitation required to join
+
+**Member Roles:**
+- `admin` - Full control (can do everything)
+- `moderator` - Can manage members and invite users
+- `member` - Regular member with basic permissions
+
+**Membership States:**
+- `active` - Active member
+- `pending` - Requested to join (awaiting approval)
+- `invited` - Invited by admin (awaiting acceptance)
+- `removed` - Removed from group by admin
+- `left` - User left the group voluntarily
 
 **Important Rules:**
-- Connection is **immediately established** when request is accepted
-- Messaging is enabled immediately after acceptance
-- Only **sender** can cancel pending requests (DELETE)
-- Only **receiver** can accept/reject pending requests
-- **Both parties** can block at any state
-- A user can only have **one connection request** with another user at a time
-- Cannot send connection request to yourself
+- At least one admin must exist at all times
+- Cannot remove or demote the last admin
+- Group creator automatically becomes admin
+- Group conversation auto-created on group creation
+- Only active members can access group chat
 
-**Permissions:**
-- Cancel request: Only sender, only pending state
-- Accept/Reject: Only receiver, only pending state
-- Block: Both sender and receiver, any state except blocked
+---
 
-### Chat System
-
-**Real-time Messaging:**
-- Chat available **only for accepted connections**
-- Conversation is **auto-created** when connection is accepted
-- Supports both **REST API** (message history) and **WebSocket** (real-time)
-
-**WebSocket Connection:**
-```
-ws://localhost:8000/ws/chat/{conversation_id}/?token={access_token}
-```
-
-**Features:**
-- Real-time message delivery
-- Typing indicators
-- Message read receipts
-- Unread message count
-- Message history pagination
-
-**Authentication:**
-- REST API: Standard JWT Bearer token in header
-- WebSocket: Token in query string or Authorization header
-
-**Permissions:**
-- Only conversation participants can access
-- Only users with accepted connections can message
-- Messages cannot be edited or deleted
-
-### Privacy Levels
-- `open` - Anyone can view profile
-- `friends_of_friends` - Only friends and their friends can view
-- `private` - Only the user can view
-
-### User Status
-- `active` - Normal active user
-- `banned` - User is banned
-- `deleted` - User account deleted
-
-### Geographic Data
-- All geographic coordinates use **SRID 4326** (WGS 84)
-- Latitude range: -90 to 90
-- Longitude range: -180 to 180
-- Distance calculations use PostGIS for accuracy
-- Proximity searches use PostGIS GIST indexes for performance
-
-### Caching
-- Connection requests and connections are cached in Redis
-- Cache TTL:
-  - Connection requests: 5 minutes
-  - User connections: 10 minutes
-  - Accepted connections: 10 minutes
-- Cache is invalidated automatically when connection state changes
-
-### Error Responses
-
-**400 Bad Request:**
-```json
-{
-  "field_name": ["Error message"]
-}
-```
-
-**401 Unauthorized:**
-```json
-{
-  "detail": "Authentication credentials were not provided."
-}
-```
-
-**403 Forbidden:**
-```json
-{
-  "detail": "You do not have permission to perform this action."
-}
-```
-
-**404 Not Found:**
-```json
-{
-  "detail": "Not found."
-}
-```
-
-**500 Internal Server Error:**
-```json
-{
-  "detail": "Internal server error."
-}
-```
+*Last Updated: 2025-10-30*
+*For interactive API testing, visit: http://localhost:8000/api/docs/*

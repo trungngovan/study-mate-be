@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     "matching",
     "chat",
     "auth.apps.AuthConfig",
+    "sessions",
+    "groups",
 ]
 
 MIDDLEWARE = [

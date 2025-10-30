@@ -31,6 +31,8 @@ urlpatterns = [
     path("api/", include("learning.urls")),
     path("api/matching/", include("matching.urls")),
     path("api/chat/", include("chat.urls")),
+    path("api/sessions/", include("sessions.urls")),
+    path("api/groups/", include("groups.urls")),
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
