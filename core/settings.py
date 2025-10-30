@@ -98,11 +98,11 @@ ASGI_APPLICATION = "core.asgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.environ.get("DB_NAME", "study_mate"),
-        "USER": os.environ.get("DB_USER", "test"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "test"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+        "NAME": config("DB_NAME", default="study_mate"),
+        "USER": config("DB_USER", default="test"),
+        "PASSWORD": config("DB_PASSWORD", default="test"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default=5432, cast=int),
     }
 }
 
