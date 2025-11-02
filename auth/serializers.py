@@ -1,12 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from users.models import User
+from locations.models import School
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for user registration."""
     password = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})
     password_confirm = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})
+    school = serializers.IntegerField(required=False, allow_null=True)
     
     class Meta:
         model = User
@@ -17,7 +19,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'phone': {'required': False},
-            'school': {'required': False},
             'major': {'required': False},
             'year': {'required': False},
             'bio': {'required': False},
@@ -25,6 +26,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'learning_radius_km': {'required': False},
             'privacy_level': {'required': False},
         }
+    
+    def validate_school(self, value):
+        """Validate school field - if school doesn't exist, set to None since it's optional."""
+        if value is not None:
+            try:
+                # Check if school exists
+                School.objects.get(pk=value)
+                return value
+            except School.DoesNotExist:
+                # Since school is optional, return None instead of raising error
+                return None
+        return value
     
     def validate(self, attrs):
         """Validate that passwords match."""
@@ -35,6 +48,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user with hashed password."""
         password = validated_data.pop('password')
+        
+        # Handle school field - convert integer to School object if provided
+        school_id = validated_data.pop('school', None)
+        if school_id is not None:
+            try:
+                validated_data['school'] = School.objects.get(pk=school_id)
+            except School.DoesNotExist:
+                validated_data['school'] = None
+        
         user = User.objects.create_user(password=password, **validated_data)
         return user
 
