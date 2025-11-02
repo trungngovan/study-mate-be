@@ -110,12 +110,12 @@ DATABASES = {
 
 # GDAL/GEOS Configuration for GeoDjango
 # https://docs.djangoproject.com/en/5.2/ref/contrib/gis/install/
-GDAL_LIBRARY_PATH = os.environ.get(
-    "GDAL_LIBRARY_PATH", "/opt/homebrew/lib/libgdal.dylib"
-)
-GEOS_LIBRARY_PATH = os.environ.get(
-    "GEOS_LIBRARY_PATH", "/opt/homebrew/lib/libgeos_c.dylib"
-)
+# Only set library paths if explicitly provided via environment variables
+# Django will auto-detect libraries on Linux systems if not specified
+if os.environ.get("GDAL_LIBRARY_PATH"):
+    GDAL_LIBRARY_PATH = os.environ.get("GDAL_LIBRARY_PATH")
+if os.environ.get("GEOS_LIBRARY_PATH"):
+    GEOS_LIBRARY_PATH = os.environ.get("GEOS_LIBRARY_PATH")
 
 
 # Password validation
