@@ -1693,6 +1693,8 @@ Remove goal from user's list.
 - **Connections**: `page`, `page_size` (pagination)
 - **Chat Messages**: `page`, `page_size` (pagination)
 - **Conversations**: `page`, `page_size` (pagination)
+- **Session Participants**: `page`, `page_size` (pagination)
+- **Group Members**: `page`, `page_size` (pagination)
 
 ---
 
@@ -1830,4 +1832,773 @@ ws://localhost:8000/ws/chat/{conversation_id}/?token={access_token}
 {
   "detail": "Internal server error."
 }
+```
+
+---
+
+## Authentication
+
+All endpoints require JWT authentication:
+
+```
+Authorization: Bearer <your_access_token>
+```
+
+For WebSockets, include token in query string:
+```
+ws://domain/ws/groups/5/chat/?token=<your_access_token>
+```
+
+---
+
+## Interactive Documentation
+
+- **Swagger UI**: [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/)
+- **ReDoc**: [http://localhost:8000/api/redoc/](http://localhost:8000/api/redoc/)
+- **OpenAPI Schema**: [http://localhost:8000/api/schema/](http://localhost:8000/api/schema/)
+
+---
+
+*For detailed field descriptions and complete examples, visit `/api/docs/` after starting the server.*
+
+## Study Sessions API
+
+**Base URL:** `/api/sessions/`
+
+### Key Features
+- Create in-person, virtual, or hybrid study sessions
+- Discover nearby sessions
+- Join/leave sessions
+- Check-in/check-out tracking
+- Recurrence support (daily, weekly, monthly)
+
+### Main Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/sessions/` | List all sessions (with filters) |
+| POST | `/api/sessions/` | Create new session |
+| GET | `/api/sessions/{id}/` | Get session details |
+| PUT/PATCH | `/api/sessions/{id}/` | Update session (host only) |
+| DELETE | `/api/sessions/{id}/` | Cancel session (host only) |
+| POST | `/api/sessions/{id}/join/` | Join a session |
+| POST | `/api/sessions/{id}/leave/` | Leave a session |
+| POST | `/api/sessions/{id}/check_in/` | Check in to session |
+| POST | `/api/sessions/{id}/check_out/` | Check out of session |
+| GET | `/api/sessions/{id}/participants/` | List participants (paginated) |
+| GET | `/api/sessions/my_sessions/` | User's sessions |
+| GET | `/api/sessions/monthly_sessions/` | Get user's sessions for a specific month |
+| GET | `/api/sessions/nearby/` | Find nearby sessions |
+
+### Query Parameters for Listing
+
+- `status`: `upcoming`, `in_progress`, `completed`, `cancelled`
+- `session_type`: `in_person`, `virtual`, `hybrid`
+- `subject`: Subject ID (integer)
+- `time_filter`: `upcoming`, `past`
+
+---
+
+### GET `/api/sessions/{id}/`
+
+Get session details. Returns full session information without participants list. Use `/api/sessions/{id}/participants/` to get paginated participants.
+
+**Authentication:** Required
+
+**Response (200):**
+```json
+{
+    "id": 9,
+    "title": "Test user 12",
+    "description": "",
+    "host": {
+        "id": 13,
+        "email": "user12@example.com",
+        "full_name": "User 12",
+        "avatar_url": null,
+        "school": null,
+        "major": "Law",
+        "year": 1
+    },
+    "subject": null,
+    "session_type": "in_person",
+    "location_name": "HCM",
+    "location_address": "",
+    "geom_point": null,
+    "meeting_link": "",
+    "start_time": "2025-11-13T00:05:00Z",
+    "end_time": "2025-11-13T01:05:00Z",
+    "duration_minutes": 60,
+    "recurrence_pattern": "none",
+    "recurrence_end_date": null,
+    "max_participants": null,
+    "participant_count": 2,
+    "is_full": false,
+    "status": "upcoming",
+    "is_host": false,
+    "is_participant": true,
+    "is_checked_in": false,
+    "can_join": false,
+    "can_leave": true,
+    "can_edit": false,
+    "can_cancel": false,
+    "created_at": "2025-11-01T17:05:36.615903Z",
+    "updated_at": "2025-11-01T17:06:28.035924Z"
+}
+```
+
+**Note:** The `participants` field has been removed from this endpoint. Use `/api/sessions/{id}/participants/` to get paginated participants list.
+
+---
+
+### GET `/api/sessions/{id}/participants/`
+
+Get paginated list of session participants.
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `page` (integer, optional): Page number (default: 1)
+- `page_size` (integer, optional): Number of results per page (default: 12)
+
+**Response (200):**
+```json
+{
+    "count": 25,
+    "next": "http://localhost:8000/api/sessions/9/participants/?page=2",
+    "previous": null,
+    "results": [
+        {
+            "id": 12,
+            "user": {
+                "id": 13,
+                "email": "user12@example.com",
+                "full_name": "User 12",
+                "avatar_url": null,
+                "school": null,
+                "major": "Law",
+                "year": 1
+            },
+            "status": "registered",
+            "check_in_time": null,
+            "check_out_time": null,
+            "duration_minutes": null,
+            "notes": "",
+            "joined_at": "2025-11-01T17:05:36.633277Z",
+            "updated_at": "2025-11-01T17:05:36.633284Z"
+        },
+        {
+            "id": 14,
+            "user": {
+                "id": 1,
+                "email": "admin@admin.com",
+                "full_name": "Trung Ngo",
+                "avatar_url": null,
+                "school": null,
+                "major": "Test",
+                "year": 5
+            },
+            "status": "registered",
+            "check_in_time": null,
+            "check_out_time": null,
+            "duration_minutes": null,
+            "notes": "",
+            "joined_at": "2025-11-01T17:06:16.861932Z",
+            "updated_at": "2025-11-01T17:06:16.861941Z"
+        }
+    ]
+}
+```
+
+**Response Fields:**
+- `count` - Total number of participants
+- `next` - URL to next page (null if last page)
+- `previous` - URL to previous page (null if first page)
+- `results` - Array of participant objects
+
+**Participant Status Values:**
+- `registered` - Registered but not yet attended
+- `attended` - Has checked in to the session
+- `no_show` - Registered but did not attend
+- `cancelled` - Participation cancelled
+
+**Example Usage:**
+```javascript
+// Get first page with default page size (12)
+const participants = await fetch('/api/sessions/9/participants/', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+
+// Get specific page with custom page size
+const participants = await fetch('/api/sessions/9/participants/?page=2&page_size=20', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+```
+
+---
+
+### GET `/api/sessions/monthly_sessions/`
+
+Get all user sessions within a specific month for calendar view. Returns sessions the user is hosting or participating in.
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `month` (integer, required): Month (1-12)
+- `year` (integer, required): Year (e.g., 2024)
+
+**Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "title": "Calculus Study Group",
+    "description": "Weekly calculus review",
+    "host": {
+      "id": 10,
+      "email": "host@example.com",
+      "full_name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg",
+      "school": 1,
+      "major": "Mathematics",
+      "year": 2
+    },
+    "subject": {
+      "id": 5,
+      "code": "MATH101",
+      "name_en": "Calculus I",
+      "name_vi": "Giải tích I",
+      "level": "undergraduate"
+    },
+    "session_type": "virtual",
+    "location_name": "",
+    "start_time": "2024-12-05T14:00:00Z",
+    "end_time": "2024-12-05T16:00:00Z",
+    "duration_minutes": 120,
+    "participant_count": 3,
+    "max_participants": null,
+    "is_full": false,
+    "status": "upcoming",
+    "is_host": true,
+    "is_participant": true,
+    "created_at": "2024-11-20T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "title": "Physics Lab Prep",
+    "description": "Preparing for lab exam",
+    "host": {
+      "id": 15,
+      "email": "another@example.com",
+      "full_name": "Jane Smith",
+      "avatar_url": "https://example.com/avatar2.jpg",
+      "school": 1,
+      "major": "Physics",
+      "year": 3
+    },
+    "subject": {
+      "id": 8,
+      "code": "PHYS201",
+      "name_en": "Physics II",
+      "name_vi": "Vật lý II",
+      "level": "undergraduate"
+    },
+    "session_type": "in_person",
+    "location_name": "Library Room 301",
+    "start_time": "2024-12-15T09:00:00Z",
+    "end_time": "2024-12-15T11:00:00Z",
+    "duration_minutes": 120,
+    "participant_count": 5,
+    "max_participants": 8,
+    "is_full": false,
+    "status": "upcoming",
+    "is_host": false,
+    "is_participant": true,
+    "created_at": "2024-11-25T12:00:00Z"
+  }
+]
+```
+
+**Response Fields:**
+- `start_time` - Session start time (ISO 8601 format)
+- `end_time` - Session end time (calculated from start_time + duration_minutes)
+- `duration_minutes` - Session duration in minutes
+- All other fields from session list serializer
+
+**Error Responses:**
+
+**400 Bad Request:**
+```json
+{
+  "error": "Both month and year are required."
+}
+```
+
+```json
+{
+  "error": "Month must be between 1 and 12."
+}
+```
+
+```json
+{
+  "error": "Month and year must be valid integers."
+}
+```
+
+**Example Usage:**
+
+```javascript
+const sessions = await fetch('/api/sessions/monthly_sessions/?month=12&year=2024', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+```
+
+---
+
+## Dashboard Statistics API
+
+**Base URL:** `/api/dashboard/`
+
+### Key Features
+- Comprehensive dashboard statistics for authenticated users
+- Session statistics (hosting, attending, participation details)
+- Connection statistics (pending requests, accepted connections)
+
+### Main Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/statistics/` | Get dashboard statistics |
+
+---
+
+### GET `/api/dashboard/statistics/`
+
+Get comprehensive dashboard statistics for the authenticated user. Includes session statistics and connection statistics.
+
+**Authentication:** Required
+
+**Response (200):**
+```json
+{
+  "sessions": {
+    "sessions_hosted_total": 15,
+    "sessions_hosted_upcoming": 5,
+    "sessions_hosted_in_progress": 1,
+    "sessions_hosted_completed": 8,
+    "sessions_hosted_cancelled": 1,
+    "sessions_attending_total": 12,
+    "sessions_attending_upcoming": 4,
+    "sessions_attending_in_progress": 0,
+    "sessions_attending_completed": 8,
+    "total_participations": 27,
+    "participations_attended": 16,
+    "participations_registered": 5,
+    "participations_no_show": 3,
+    "participations_cancelled": 3,
+    "sessions_by_type": {
+      "in_person": 10,
+      "virtual": 12,
+      "hybrid": 5
+    },
+    "total_participants_in_hosted_sessions": 35
+  },
+  "connections": {
+    "sent_pending": 3,
+    "received_pending": 2,
+    "accepted_connections": 25,
+    "total_requests": 5
+  }
+}
+```
+
+**Response Fields:**
+
+**Sessions Statistics:**
+- `sessions_hosted_total` - Total number of sessions hosted by user
+- `sessions_hosted_upcoming` - Number of upcoming hosted sessions
+- `sessions_hosted_in_progress` - Number of in-progress hosted sessions
+- `sessions_hosted_completed` - Number of completed hosted sessions
+- `sessions_hosted_cancelled` - Number of cancelled hosted sessions
+- `sessions_attending_total` - Total number of sessions user is attending (excluding hosted)
+- `sessions_attending_upcoming` - Number of upcoming sessions user is attending
+- `sessions_attending_in_progress` - Number of in-progress sessions user is attending
+- `sessions_attending_completed` - Number of completed sessions user attended
+- `total_participations` - Total number of session participations (including hosting)
+- `participations_attended` - Number of participations with attended status
+- `participations_registered` - Number of participations with registered status
+- `participations_no_show` - Number of participations with no_show status
+- `participations_cancelled` - Number of participations with cancelled status
+- `sessions_by_type` - Breakdown of sessions by type (in_person, virtual, hybrid)
+- `total_participants_in_hosted_sessions` - Total participants across all hosted sessions (excluding host)
+
+**Connections Statistics:**
+- `sent_pending` - Number of pending connection requests sent by user
+- `received_pending` - Number of pending connection requests received by user
+- `accepted_connections` - Number of accepted connections
+- `total_requests` - Total number of pending requests (sent + received)
+
+**Example Usage:**
+```javascript
+const stats = await fetch('/api/dashboard/statistics/', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+
+console.log(`Total sessions hosted: ${stats.sessions.sessions_hosted_total}`);
+console.log(`Total connections: ${stats.connections.accepted_connections}`);
+```
+
+**Error Responses:**
+
+**401 Unauthorized:**
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+---
+
+## Study Groups API
+
+**Base URL:** `/api/groups/`
+
+### Key Features
+- Create persistent study groups
+- Public, private, or invite-only groups
+- Role-based permissions (admin, moderator, member)
+- Group chat with WebSocket support
+- Member management
+
+### Main Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/` | List all groups (with filters) |
+| POST | `/api/groups/` | Create new group |
+| GET | `/api/groups/{id}/` | Get group details |
+| PUT/PATCH | `/api/groups/{id}/` | Update group (admin only) |
+| DELETE | `/api/groups/{id}/` | Archive group (admin only) |
+| POST | `/api/groups/{id}/join/` | Join/request to join |
+| POST | `/api/groups/{id}/leave/` | Leave group |
+| POST | `/api/groups/{id}/invite/` | Invite user (mod/admin) |
+| GET | `/api/groups/{id}/members/` | List members (paginated) |
+| GET | `/api/groups/my_groups/` | User's groups |
+| GET | `/api/groups/nearby/` | Find nearby groups |
+
+---
+
+### GET `/api/groups/{id}/`
+
+Get group details. Returns full group information without memberships list. Use `/api/groups/{id}/members/` to get paginated memberships.
+
+**Authentication:** Required
+
+**Response (200):**
+```json
+{
+    "id": 3,
+    "name": "HCMUS",
+    "description": "Test HCMUS group",
+    "avatar_url": null,
+    "created_by": {
+        "id": 1,
+        "email": "admin@admin.com",
+        "full_name": "Trung Ngo",
+        "avatar_url": null,
+        "school": null,
+        "major": "Test",
+        "year": 5
+    },
+    "school": null,
+    "geom_point": null,
+    "subjects": [],
+    "privacy": "public",
+    "max_members": null,
+    "member_count": 1,
+    "is_full": false,
+    "status": "active",
+    "is_member": true,
+    "is_admin": true,
+    "is_moderator": true,
+    "can_join": false,
+    "can_leave": false,
+    "can_edit": true,
+    "can_manage_members": true,
+    "user_membership": {
+        "id": 4,
+        "user": {
+            "id": 1,
+            "email": "admin@admin.com",
+            "full_name": "Trung Ngo",
+            "avatar_url": null,
+            "school": null,
+            "major": "Test",
+            "year": 5
+        },
+        "role": "admin",
+        "status": "active",
+        "invited_by": null,
+        "joined_at": "2025-11-02T01:53:32.501700Z",
+        "updated_at": "2025-11-02T01:53:32.501716Z",
+        "left_at": null
+    },
+    "user_role": "admin",
+    "user_membership_status": "active",
+    "created_at": "2025-11-02T01:53:32.480302Z",
+    "updated_at": "2025-11-02T01:53:32.480331Z"
+}
+```
+
+**Note:** The `memberships` field has been removed from this endpoint. Use `/api/groups/{id}/members/` to get paginated memberships list.
+
+---
+
+### GET `/api/groups/{id}/members/`
+
+Get paginated list of group memberships.
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `page` (integer, optional): Page number (default: 1)
+- `page_size` (integer, optional): Number of results per page (default: 12)
+
+**Response (200):**
+```json
+{
+    "count": 15,
+    "next": "http://localhost:8000/api/groups/3/members/?page=2",
+    "previous": null,
+    "results": [
+        {
+            "id": 4,
+            "user": {
+                "id": 1,
+                "email": "admin@admin.com",
+                "full_name": "Trung Ngo",
+                "avatar_url": null,
+                "school": null,
+                "major": "Test",
+                "year": 5
+            },
+            "role": "admin",
+            "status": "active",
+            "invited_by": null,
+            "joined_at": "2025-11-02T01:53:32.501700Z",
+            "updated_at": "2025-11-02T01:53:32.501716Z",
+            "left_at": null
+        }
+    ]
+}
+```
+
+**Response Fields:**
+- `count` - Total number of memberships
+- `next` - URL to next page (null if last page)
+- `previous` - URL to previous page (null if first page)
+- `results` - Array of membership objects
+
+**Membership Status Values:**
+- `active` - Active member
+- `pending` - Join request pending approval
+- `invited` - Invited to join (for invite-only groups)
+- `left` - Former member who left
+
+**Membership Role Values:**
+- `admin` - Group administrator
+- `moderator` - Group moderator
+- `member` - Regular member
+
+**Visibility Rules:**
+- Non-members can only see `active` memberships
+- Members can see all memberships (including `pending` and `invited`)
+
+**Example Usage:**
+```javascript
+// Get first page with default page size (12)
+const members = await fetch('/api/groups/3/members/', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+
+// Get specific page with custom page size
+const members = await fetch('/api/groups/3/members/?page=2&page_size=20', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => r.json());
+```
+
+---
+
+### Group Membership Management
+
+**Base URL:** `/api/groups/memberships/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/memberships/{id}/` | Get membership details |
+| PATCH | `/api/groups/memberships/{id}/role/` | Update role (admin) |
+| POST | `/api/groups/memberships/{id}/accept/` | Accept join request (admin) |
+| POST | `/api/groups/memberships/{id}/reject/` | Reject join request (admin) |
+| POST | `/api/groups/memberships/{id}/remove/` | Remove member (admin) |
+
+### Group Messages
+
+**Base URL:** `/api/groups/{group_id}/messages/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups/{group_id}/messages/` | List messages |
+| POST | `/api/groups/{group_id}/messages/` | Send message |
+| POST | `/api/groups/{group_id}/messages/mark_read/` | Mark as read |
+
+---
+
+## WebSocket APIs
+
+### Group Chat WebSocket
+
+**URL:** `ws://your-domain/ws/groups/{group_id}/chat/?token={jwt_token}`
+
+**Client → Server Messages:**
+
+```json
+// Send message
+{"type": "chat_message", "content": "Hello!"}
+
+// Typing indicator
+{"type": "typing_indicator", "is_typing": true}
+
+// Mark as read
+{"type": "message_read", "message_ids": [1, 2, 3]}
+```
+
+**Server → Client Messages:**
+
+```json
+// New message
+{
+  "type": "chat_message",
+  "message_id": 105,
+  "sender_id": 10,
+  "sender_name": "John Doe",
+  "sender_avatar": "https://...",
+  "content": "Hello!",
+  "created_at": "2025-10-30T16:00:00Z"
+}
+
+// Typing indicator
+{
+  "type": "typing_indicator",
+  "user_id": 10,
+  "user_name": "John Doe",
+  "is_typing": true
+}
+
+// Messages read
+{
+  "type": "messages_read",
+  "user_id": 15,
+  "message_ids": [1, 2, 3],
+  "read_at": "2025-10-30T16:05:00Z"
+}
+```
+
+---
+
+## Quick Start Examples
+
+### Create and Join a Study Session
+
+```javascript
+// Create session
+const session = await fetch('/api/sessions/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    title: 'Calculus Study Group',
+    session_type: 'virtual',
+    meeting_link: 'https://zoom.us/j/123',
+    start_time: '2025-11-01T14:00:00Z',
+    duration_minutes: 120
+  })
+}).then(r => r.json());
+
+// Join session
+await fetch(`/api/sessions/${session.id}/join/`, {
+  method: 'POST',
+  headers: {'Authorization': `Bearer ${token}`}
+});
+```
+
+### Create and Manage a Study Group
+
+```javascript
+// Create group
+const group = await fetch('/api/groups/', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Machine Learning Club',
+    description: 'Weekly ML discussions',
+    privacy: 'public',
+    subject_ids: [10, 11]
+  })
+}).then(r => r.json());
+
+// Invite user
+await fetch(`/api/groups/${group.id}/invite/`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({user_id: 42})
+});
+```
+
+### Connect to Group Chat
+
+```javascript
+const ws = new WebSocket(
+  `ws://localhost:8000/ws/groups/${groupId}/chat/?token=${token}`
+);
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (data.type === 'chat_message') {
+    console.log(`${data.sender_name}: ${data.content}`);
+  }
+};
+
+// Send message
+ws.send(JSON.stringify({
+  type: 'chat_message',
+  content: 'Hello everyone!'
+}));
 ```
