@@ -110,12 +110,38 @@ DATABASES = {
 
 # GDAL/GEOS Configuration for GeoDjango
 # https://docs.djangoproject.com/en/5.2/ref/contrib/gis/install/
-# Only set library paths if explicitly provided via environment variables
-# Django will auto-detect libraries on Linux systems if not specified
-if os.environ.get("GDAL_LIBRARY_PATH"):
-    GDAL_LIBRARY_PATH = os.environ.get("GDAL_LIBRARY_PATH")
-if os.environ.get("GEOS_LIBRARY_PATH"):
-    GEOS_LIBRARY_PATH = os.environ.get("GEOS_LIBRARY_PATH")
+import glob
+import re
+
+def find_library(lib_name, env_var_name, default_path=None):
+    """Find library file if path from env var doesn't exist"""
+    env_path = os.environ.get(env_var_name)
+    if env_path and os.path.exists(env_path):
+        return env_path
+    
+    # Try to find library in common locations
+    search_paths = [
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/lib/aarch64-linux-gnu",
+        "/usr/lib",
+    ]
+    
+    lib_pattern = f"{lib_name}*"
+    for search_path in search_paths:
+        matches = glob.glob(os.path.join(search_path, lib_pattern))
+        if matches:
+            # Prefer .so files (symlinks) over versioned ones
+            so_files = [f for f in matches if f.endswith('.so') and not re.search(r'\.so\.\d', f)]
+            if so_files:
+                return so_files[0]
+            # Otherwise return highest version
+            return sorted(matches)[-1]
+    
+    return default_path or env_path
+
+# Auto-detect GDAL and GEOS library paths if not explicitly set or if path doesn't exist
+GDAL_LIBRARY_PATH = find_library("libgdal.so", "GDAL_LIBRARY_PATH")
+GEOS_LIBRARY_PATH = find_library("libgeos_c.so", "GEOS_LIBRARY_PATH")
 
 
 # Password validation
@@ -153,6 +179,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
