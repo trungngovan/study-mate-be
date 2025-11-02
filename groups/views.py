@@ -356,12 +356,26 @@ class StudyGroupViewSet(viewsets.ModelViewSet):
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                description='Page number for pagination (default: 1)'
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                description='Number of results per page (default: 12, max: 100)'
+            ),
+        ],
         responses={200: GroupMembershipSerializer(many=True)},
-        description="List all members of the group"
+        description="List all members of the group (paginated)"
     )
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
-        """List group members."""
+        """List group members with pagination."""
+        from rest_framework.pagination import PageNumberPagination
+        
         group = self.get_object()
 
         # Only show active members to non-members
@@ -373,12 +387,74 @@ class StudyGroupViewSet(viewsets.ModelViewSet):
 
         memberships = memberships.select_related('user', 'invited_by').order_by('-role', 'joined_at')
 
+        # Create paginator instance
+        paginator = PageNumberPagination()
+        
+        # Get page_size from query params, default to 12
+        try:
+            page_size = int(request.query_params.get('page_size', 12))
+            # Limit max page_size
+            if page_size > 100:
+                page_size = 100
+            paginator.page_size = page_size
+        except (ValueError, TypeError):
+            paginator.page_size = 12
+        
+        paginator.max_page_size = 100
+        
+        # Convert queryset to list to ensure pagination works
+        memberships_list = list(memberships)
+        total_count = len(memberships_list)
+        
+        # Get page number from query params (default: 1)
+        try:
+            page_number = int(request.query_params.get('page', 1))
+        except (ValueError, TypeError):
+            page_number = 1
+        
+        # Calculate pagination
+        start_index = (page_number - 1) * paginator.page_size
+        end_index = start_index + paginator.page_size
+        paginated_memberships = memberships_list[start_index:end_index]
+        
+        # Serialize the paginated results
         serializer = GroupMembershipSerializer(
-            memberships,
+            paginated_memberships,
             many=True,
             context={'request': request}
         )
-        return Response(serializer.data)
+        
+        # Create paginated response manually
+        response_data = {
+            'count': total_count,
+            'next': None,
+            'previous': None,
+            'results': serializer.data
+        }
+        
+        # Set next URL if there are more results
+        if end_index < total_count:
+            next_page = page_number + 1
+            from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+            parsed = urlparse(request.build_absolute_uri())
+            query_params = parse_qs(parsed.query)
+            query_params['page'] = [str(next_page)]
+            query_params['page_size'] = [str(paginator.page_size)]
+            new_query = urlencode(query_params, doseq=True)
+            response_data['next'] = urlunparse(parsed._replace(query=new_query))
+        
+        # Set previous URL if not on first page
+        if page_number > 1:
+            prev_page = page_number - 1
+            from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+            parsed = urlparse(request.build_absolute_uri())
+            query_params = parse_qs(parsed.query)
+            query_params['page'] = [str(prev_page)]
+            query_params['page_size'] = [str(paginator.page_size)]
+            new_query = urlencode(query_params, doseq=True)
+            response_data['previous'] = urlunparse(parsed._replace(query=new_query))
+        
+        return Response(response_data)
 
     @extend_schema(
         responses={200: StudyGroupListSerializer(many=True)},
@@ -603,13 +679,14 @@ class GroupMessageViewSet(viewsets.GenericViewSet):
     ViewSet for managing group messages.
 
     Endpoints:
-    - GET /api/groups/{group_id}/messages/ - List messages
+    - GET /api/groups/{group_id}/messages/ - List messages (paginated)
     - POST /api/groups/{group_id}/messages/ - Send a message
     - POST /api/groups/{group_id}/messages/mark_read/ - Mark messages as read
     """
 
     permission_classes = [IsAuthenticated, IsGroupMember]
     serializer_class = GroupMessageSerializer
+    pagination_class = None  # We'll use custom pagination
 
     def get_group(self):
         """Get the group from the URL."""
@@ -626,19 +703,46 @@ class GroupMessageViewSet(viewsets.GenericViewSet):
 
         try:
             conversation = group.conversation
+            # Order by -created_at for pagination (newest first)
+            # Frontend will reverse to show oldest first
             return GroupMessage.objects.filter(
                 conversation=conversation
-            ).select_related('sender').order_by('created_at')
+            ).select_related('sender').order_by('-created_at')
         except GroupConversation.DoesNotExist:
             return GroupMessage.objects.none()
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                description='Page number'
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                description='Number of messages per page (default: 50)'
+            ),
+        ],
         responses={200: GroupMessageSerializer(many=True)},
-        description="List group messages"
+        description="List group messages with pagination"
     )
     def list(self, request, group_id=None):
-        """List group messages."""
+        """List group messages with pagination."""
+        from rest_framework.pagination import PageNumberPagination
+        
         queryset = self.get_queryset()
+        
+        # Custom paginator
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get('page_size', 50))
+        paginator.max_page_size = 100
+        
+        page = paginator.paginate_queryset(queryset, request)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 

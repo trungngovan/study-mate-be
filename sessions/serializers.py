@@ -125,13 +125,16 @@ class StudySessionDetailSerializer(serializers.ModelSerializer):
 
     host = UserBasicSerializer(read_only=True)
     subject = SubjectBasicSerializer(read_only=True)
-    participants = SessionParticipantSerializer(many=True, read_only=True)
     participant_count = serializers.IntegerField(read_only=True)
     is_full = serializers.BooleanField(read_only=True)
     end_time = serializers.DateTimeField(read_only=True)
     is_host = serializers.SerializerMethodField()
     is_participant = serializers.SerializerMethodField()
+    is_checked_in = serializers.SerializerMethodField()
     can_join = serializers.SerializerMethodField()
+    can_leave = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    can_cancel = serializers.SerializerMethodField()
 
     class Meta:
         model = StudySession
@@ -155,10 +158,13 @@ class StudySessionDetailSerializer(serializers.ModelSerializer):
             'participant_count',
             'is_full',
             'status',
-            'participants',
             'is_host',
             'is_participant',
+            'is_checked_in',
             'can_join',
+            'can_leave',
+            'can_edit',
+            'can_cancel',
             'created_at',
             'updated_at',
         ]
@@ -169,10 +175,13 @@ class StudySessionDetailSerializer(serializers.ModelSerializer):
             'is_full',
             'end_time',
             'status',
-            'participants',
             'is_host',
             'is_participant',
+            'is_checked_in',
             'can_join',
+            'can_leave',
+            'can_edit',
+            'can_cancel',
             'created_at',
             'updated_at',
         ]
@@ -194,11 +203,49 @@ class StudySessionDetailSerializer(serializers.ModelSerializer):
             ).exists()
         return False
 
+    def get_is_checked_in(self, obj):
+        """Check if current user is checked in."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            participant = obj.participants.filter(user=request.user).first()
+            if participant:
+                return participant.check_in_time is not None
+        return False
+
     def get_can_join(self, obj):
         """Check if current user can join the session."""
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.can_join(request.user)
+        return False
+
+    def get_can_leave(self, obj):
+        """Check if current user can leave the session."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Can leave if participant and session hasn't started yet
+            is_participant = obj.participants.filter(
+                user=request.user,
+                status__in=[SessionParticipant.STATUS_REGISTERED, SessionParticipant.STATUS_ATTENDED]
+            ).exists()
+            if is_participant:
+                from django.utils import timezone
+                return obj.start_time > timezone.now()
+        return False
+
+    def get_can_edit(self, obj):
+        """Check if current user can edit the session."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.host == request.user
+        return False
+
+    def get_can_cancel(self, obj):
+        """Check if current user can cancel the session."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Only host can cancel, and only if status is upcoming
+            return obj.host == request.user and obj.status == obj.STATUS_UPCOMING
         return False
 
 
@@ -247,7 +294,8 @@ class CreateStudySessionSerializer(serializers.ModelSerializer):
                 )
 
         # Validate recurrence
-        if data.get('recurrence_pattern') != StudySession.RECURRENCE_NONE:
+        recurrence_pattern = data.get('recurrence_pattern')
+        if recurrence_pattern and recurrence_pattern != StudySession.RECURRENCE_NONE:
             if not data.get('recurrence_end_date'):
                 raise serializers.ValidationError(
                     "Recurring sessions must have a recurrence end date."

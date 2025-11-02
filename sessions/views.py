@@ -43,6 +43,7 @@ class StudySessionViewSet(viewsets.ModelViewSet):
     - POST /api/sessions/{id}/check_out/ - Check out of a session
     - GET /api/sessions/{id}/participants/ - List participants
     - GET /api/sessions/my_sessions/ - List user's sessions (hosting or attending)
+    - GET /api/sessions/monthly_sessions/ - Get user's sessions for a specific month
     - GET /api/sessions/nearby/ - Find nearby sessions
     """
 
@@ -314,15 +315,45 @@ class StudySessionViewSet(viewsets.ModelViewSet):
             )
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='page',
+                type=OpenApiTypes.INT,
+                description='Page number for pagination'
+            ),
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                description='Number of results per page'
+            ),
+        ],
         responses={200: SessionParticipantSerializer(many=True)},
-        description="List participants of a study session"
+        description="List participants of a study session (paginated)"
     )
     @action(detail=True, methods=['get'])
     def participants(self, request, pk=None):
-        """List session participants."""
+        """List session participants with pagination."""
+        from rest_framework.pagination import PageNumberPagination
+        
         session = self.get_object()
         participants = session.participants.select_related('user').order_by('joined_at')
 
+        # Create paginator instance
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get('page_size', 12))
+        paginator.max_page_size = 100
+        
+        # Paginate the queryset
+        page = paginator.paginate_queryset(participants, request)
+        if page is not None:
+            serializer = SessionParticipantSerializer(
+                page,
+                many=True,
+                context={'request': request}
+            )
+            return paginator.get_paginated_response(serializer.data)
+
+        # Fallback if pagination is not configured
         serializer = SessionParticipantSerializer(
             participants,
             many=True,
@@ -370,6 +401,92 @@ class StudySessionViewSet(viewsets.ModelViewSet):
         # Exclude cancelled by default
         queryset = queryset.exclude(status=StudySession.STATUS_CANCELLED)
 
+        serializer = StudySessionListSerializer(
+            queryset,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='month',
+                type=OpenApiTypes.INT,
+                description='Month (1-12)',
+                required=True
+            ),
+            OpenApiParameter(
+                name='year',
+                type=OpenApiTypes.INT,
+                description='Year (e.g., 2024)',
+                required=True
+            ),
+        ],
+        responses={200: StudySessionListSerializer(many=True)},
+        description="Get all user sessions within a specific month for calendar view. Accepts month and year as query parameters."
+    )
+    @action(detail=False, methods=['get'], url_path='monthly_sessions')
+    def monthly_sessions(self, request):
+        """Get all user sessions within a specific month."""
+        from datetime import datetime
+        from calendar import monthrange
+        
+        user = request.user
+        
+        # Get month and year from query params
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+        
+        if not month or not year:
+            return Response(
+                {'error': 'Both month and year are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            month = int(month)
+            year = int(year)
+            
+            # Validate month range
+            if month < 1 or month > 12:
+                return Response(
+                    {'error': 'Month must be between 1 and 12.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Calculate the start and end of the month
+            first_day = datetime(year, month, 1, 0, 0, 0)
+            last_day_num = monthrange(year, month)[1]
+            last_day = datetime(year, month, last_day_num, 23, 59, 59)
+            
+            # Convert to timezone-aware datetimes using UTC
+            first_day = timezone.make_aware(first_day, timezone.get_current_timezone())
+            last_day = timezone.make_aware(last_day, timezone.get_current_timezone())
+            
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Month and year must be valid integers.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get all sessions for the user (hosting or participating) within the month
+        queryset = StudySession.objects.filter(
+            models.Q(host=user) |
+            models.Q(
+                participants__user=user,
+                participants__status__in=[SessionParticipant.STATUS_REGISTERED, SessionParticipant.STATUS_ATTENDED]
+            )
+        ).filter(
+            start_time__gte=first_day,
+            start_time__lte=last_day
+        ).distinct().select_related(
+            'host', 'subject'
+        ).order_by('start_time')
+        
+        # Exclude cancelled sessions by default
+        queryset = queryset.exclude(status=StudySession.STATUS_CANCELLED)
+        
         serializer = StudySessionListSerializer(
             queryset,
             many=True,

@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q, Prefetch, Count
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -21,6 +22,16 @@ from chat.serializers import (
 from chat.permissions import IsConversationParticipant, CanMessageConnection
 from chat.services import ConversationService
 from matching.models import Connection
+
+
+class MessagePagination(PageNumberPagination):
+    """
+    Custom pagination for chat messages.
+    Optimized for chat UX with larger page size.
+    """
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 20
 
 
 class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -45,6 +56,17 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         elif self.action == 'mark_read':
             return MarkAsReadSerializer
         return ConversationSerializer
+    
+    @property
+    def paginator(self):
+        """
+        Use custom pagination for messages endpoint.
+        """
+        if self.action == 'messages':
+            if not hasattr(self, '_messages_paginator'):
+                self._messages_paginator = MessagePagination()
+            return self._messages_paginator
+        return super().paginator
     
     def get_queryset(self):
         """
@@ -146,19 +168,28 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
     
     @extend_schema(
         summary="Get conversation messages",
-        description="Retrieve paginated messages for a specific conversation",
+        description=(
+            "Retrieve paginated messages for a specific conversation.\n\n"
+            "**Ordering**: Messages are ordered by `created_at` DESC (newest first).\n\n"
+            "**Pagination Flow**:\n"
+            "- `page=1`: Returns the newest messages (most recent messages)\n"
+            "- `next`: Returns older messages (scroll up to see older messages)\n"
+            "- `previous`: Returns newer messages (scroll down to see newer messages)\n\n"
+            "**Default page_size**: 10 messages per page (max: 10)\n\n"
+            "For real-time updates, use WebSocket connection to receive new messages instantly."
+        ),
         parameters=[
             OpenApiParameter(
                 name='page',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
-                description='Page number for pagination'
+                description='Page number for pagination (default: 1)'
             ),
             OpenApiParameter(
                 name='page_size',
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
-                description='Number of messages per page (default: 50)'
+                description='Number of messages per page (default: 10, max: 10)'
             ),
         ],
         responses={200: MessageListSerializer(many=True)},
@@ -166,13 +197,18 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
     )
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
-        """Get all messages in a conversation with pagination."""
+        """
+        Get all messages in a conversation with pagination.
+        
+        Messages are ordered chronologically (newest first) for optimal chat UX.
+        Use 'next' link to load older messages, 'previous' for newer messages.
+        """
         conversation = self.get_object()
         
-        # Get messages ordered by creation time (oldest first)
+        # Get messages ordered by creation time (newest first for chat UX)
         messages = conversation.messages.select_related(
             'sender'
-        ).order_by('created_at')
+        ).order_by('-created_at')
         
         # Apply pagination
         page = self.paginate_queryset(messages)

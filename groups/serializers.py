@@ -79,6 +79,7 @@ class StudyGroupListSerializer(serializers.ModelSerializer):
     is_full = serializers.BooleanField(read_only=True)
     is_member = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
 
     class Meta:
         model = StudyGroup
@@ -97,6 +98,7 @@ class StudyGroupListSerializer(serializers.ModelSerializer):
             'status',
             'is_member',
             'is_admin',
+            'user_role',
             'created_at',
         ]
         read_only_fields = fields
@@ -115,6 +117,18 @@ class StudyGroupListSerializer(serializers.ModelSerializer):
             return obj.is_admin(request.user)
         return False
 
+    def get_user_role(self, obj):
+        """Get current user's role in the group."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            membership = obj.memberships.filter(
+                user=request.user,
+                status=GroupMembership.STATUS_ACTIVE
+            ).first()
+            if membership:
+                return membership.role
+        return None
+
 
 class StudyGroupDetailSerializer(serializers.ModelSerializer):
     """Serializer for study group detail view (complete)."""
@@ -122,14 +136,18 @@ class StudyGroupDetailSerializer(serializers.ModelSerializer):
     created_by = UserBasicSerializer(read_only=True)
     school = SchoolBasicSerializer(read_only=True)
     subjects = SubjectBasicSerializer(many=True, read_only=True)
-    memberships = GroupMembershipSerializer(many=True, read_only=True)
     member_count = serializers.IntegerField(read_only=True)
     is_full = serializers.BooleanField(read_only=True)
     is_member = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
     is_moderator = serializers.SerializerMethodField()
     can_join = serializers.SerializerMethodField()
+    can_leave = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    can_manage_members = serializers.SerializerMethodField()
     user_membership = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
+    user_membership_status = serializers.SerializerMethodField()
 
     class Meta:
         model = StudyGroup
@@ -147,12 +165,16 @@ class StudyGroupDetailSerializer(serializers.ModelSerializer):
             'member_count',
             'is_full',
             'status',
-            'memberships',
             'is_member',
             'is_admin',
             'is_moderator',
             'can_join',
+            'can_leave',
+            'can_edit',
+            'can_manage_members',
             'user_membership',
+            'user_role',
+            'user_membership_status',
             'created_at',
             'updated_at',
         ]
@@ -161,12 +183,16 @@ class StudyGroupDetailSerializer(serializers.ModelSerializer):
             'created_by',
             'member_count',
             'is_full',
-            'memberships',
             'is_member',
             'is_admin',
             'is_moderator',
             'can_join',
+            'can_leave',
+            'can_edit',
+            'can_manage_members',
             'user_membership',
+            'user_role',
+            'user_membership_status',
             'created_at',
             'updated_at',
         ]
@@ -199,6 +225,35 @@ class StudyGroupDetailSerializer(serializers.ModelSerializer):
             return obj.can_join(request.user)
         return False
 
+    def get_can_leave(self, obj):
+        """Check if current user can leave the group."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Can't leave if you're the only admin
+            if obj.is_admin(request.user):
+                admin_count = obj.memberships.filter(
+                    role=GroupMembership.ROLE_ADMIN,
+                    status=GroupMembership.STATUS_ACTIVE
+                ).count()
+                if admin_count <= 1:
+                    return False
+            return obj.is_member(request.user)
+        return False
+
+    def get_can_edit(self, obj):
+        """Check if current user can edit the group."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.is_admin(request.user)
+        return False
+
+    def get_can_manage_members(self, obj):
+        """Check if current user can manage members."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.is_admin(request.user) or obj.is_moderator(request.user)
+        return False
+
     def get_user_membership(self, obj):
         """Get current user's membership info."""
         request = self.context.get('request')
@@ -206,6 +261,27 @@ class StudyGroupDetailSerializer(serializers.ModelSerializer):
             membership = obj.memberships.filter(user=request.user).first()
             if membership:
                 return GroupMembershipSerializer(membership).data
+        return None
+
+    def get_user_role(self, obj):
+        """Get current user's role in the group."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            membership = obj.memberships.filter(
+                user=request.user,
+                status=GroupMembership.STATUS_ACTIVE
+            ).first()
+            if membership:
+                return membership.role
+        return None
+
+    def get_user_membership_status(self, obj):
+        """Get current user's membership status."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            membership = obj.memberships.filter(user=request.user).first()
+            if membership:
+                return membership.status
         return None
 
 

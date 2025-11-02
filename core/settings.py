@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "auth.apps.AuthConfig",
     "sessions",
     "groups",
+    "dashboard",
 ]
 
 MIDDLEWARE = [

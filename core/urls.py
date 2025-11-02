@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/chat/", include("chat.urls")),
     path("api/sessions/", include("sessions.urls")),
     path("api/groups/", include("groups.urls")),
+    path("api/dashboard/", include("dashboard.urls")),
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
